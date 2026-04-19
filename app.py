@@ -4,17 +4,19 @@ import io
 import requests
 import os
 
-# 💡 [설정] 폰트 파일명 정의 (폴더 내 파일명과 일치해야 합니다)
+# 💡 [설정] Gmarket Sans Bold 폰트 파일명 (파일명이 다를 경우 이 부분만 수정하세요)
 FONT_FILE = "GmarketSansBold.ttf"
 
-st.set_page_config(page_title="홍보물 뚝딱 제작소", layout="centered", initial_sidebar_state="collapsed")
+# 페이지 제목과 아이콘 설정 (웹브라우저 탭에 표시됨)
+st.set_page_config(page_title="GS25 신선강화점 홍보물 제작소", page_icon="🏪", layout="centered", initial_sidebar_state="collapsed")
 
-st.title("🏪 홍보물 뚝딱 제작소")
-st.caption("지마켓 산스 폰트로 더욱 깔끔해진 홍보물을 제작해보세요.")
+# 1. 메인 헤더 영역
+st.title("🏪✨ 신선강화점 홍보물 제작소")
+st.caption("홍보물 제작에서 해방되세요! 🎉")
 
 st.write("---")
 
-# 1단 레이아웃: 모바일 터치 편의성 증대
+# 2. 정보 입력 영역 (1단 레이아웃으로 모바일 터치 최적화)
 st.subheader("1. 행사 정보 입력")
 event_type = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"])
 duration = st.text_input("행사 기간", value="", placeholder="예: 4/1(화) ~ 4/30(수)")
@@ -22,29 +24,37 @@ duration = st.text_input("행사 기간", value="", placeholder="예: 4/1(화) ~
 st.write("") 
 
 st.subheader("2. 상품 정보 입력")
-# 💡 [수정] 요청하신 실전용 예시로 플레이스홀더 변경
 product_name = st.text_input("상품명", value="", placeholder="예: 신선가득꿀호떡")
 price = st.text_input("가격", value="", placeholder="예: 3개 4,000원")
 
 st.write("---")
 
+# 3. 상품 사진 업로드 영역 (상세 안내 문구 반영)
 with st.expander("📸 3. 상품 사진 넣기 (터치해서 열기)", expanded=True):
-    image_url = st.text_input("🔗 구글 이미지 주소 복사 후 붙여넣기", value="", placeholder="https://...")
-    st.write("또는")
-    uploaded_image = st.file_uploader("📂 갤러리에서 사진 업로드", type=["jpg", "jpeg", "png"])
+    # PC 사용자 가이드
+    st.markdown("**(PC 접속 시)** 구글 \"XXX 누끼\"로 검색 후 이미지 \"링크\" 주소 복사 후 붙여넣기")
+    image_url = st.text_input("🔗 이미지 주소 입력", value="", placeholder="https://...")
+    
+    st.write("---")
+    
+    # 모바일 사용자 가이드
+    st.markdown("**(모바일 접속 시)** 구글 \"XXX 누끼\"로 검색 후 이미지 다운로드 후 업로드")
+    uploaded_image = st.file_uploader("📂 이미지 파일 업로드", type=["jpg", "jpeg", "png"])
 
 st.write("---")
 
-if st.button("🚀 A4 홍보물 만들기", use_container_width=True):
+# 4. 홍보물 생성 및 렌더링 영역
+if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
     try:
-        # A4 가로 고해상도 (3508 x 2480)
+        # A4 가로 고해상도 규격 (3508 x 2480)
         A4_W, A4_H = 3508, 2480 
         
+        # 템플릿 불러오기
         img = Image.open("template.jpg").convert("RGBA")
         img = img.resize((A4_W, A4_H)) 
         draw = ImageDraw.Draw(img)
         
-        # 💡 [황금 비율 수치 고정]
+        # 디자인 수치 고정 (황금 비율)
         USER_MARGIN_PX = 72      
         USER_IMG_SCALE = 1.1     
         USER_TEXT_SCALE = 2.0    
@@ -52,12 +62,12 @@ if st.button("🚀 A4 홍보물 만들기", use_container_width=True):
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
         
-        # 1. 행사 기간
+        # [데이터 그리기 1] 행사 기간
         if duration:
             font_date = ImageFont.truetype(FONT_FILE, int(A4_W * 0.04))
             draw.text((margin_right, A4_H * 0.15), f"{duration}", font=font_date, fill=(0, 0, 0), anchor="rm")
         
-        # 2. 행사 종류 (바닥 고정 레이아웃)
+        # [데이터 그리기 2] 행사 종류 로고
         if event_type != "선택안함":
             promo_filename = f"{event_type}.png"
             if os.path.exists(promo_filename):
@@ -78,20 +88,21 @@ if st.button("🚀 A4 홍보물 만들기", use_container_width=True):
                 paste_promo_y = int((A4_H * 0.28) - target_promo_h) 
                 img.paste(promo_img, (paste_promo_x, paste_promo_y), promo_img)
             else:
-                # 이미지 없을 시 텍스트 대체
+                # 로고 파일 없을 시 텍스트로 대체
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # 3. 상품명 (지마켓 산스 + 오토 스케일링)
+        # [데이터 그리기 3] 상품명 (지마켓 산스 적용)
         if product_name:
             title_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
             font_title = ImageFont.truetype(FONT_FILE, title_size)
+            # 가로 폭 넘치면 폰트 크기 자동 조절
             while draw.textlength(product_name, font=font_title) > max_text_width and title_size > 30:
                 title_size -= 2
                 font_title = ImageFont.truetype(FONT_FILE, title_size)
             draw.text((margin_right, A4_H * 0.55), product_name, font=font_title, fill=(0, 0, 0), anchor="rm")
         
-        # 4. 가격 (지마켓 산스 + 오토 스케일링)
+        # [데이터 그리기 4] 가격
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
@@ -124,7 +135,7 @@ if st.button("🚀 A4 홍보물 만들기", use_container_width=True):
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
                 draw.text((margin_right, A4_H * 0.80), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
-        # 5. 상품 이미지
+        # [데이터 그리기 5] 상품 이미지 처리
         product_img = None
         if image_url:
             try:
@@ -153,15 +164,17 @@ if st.button("🚀 A4 홍보물 만들기", use_container_width=True):
             paste_y = int((A4_H * 0.65) - (target_h / 2)) 
             img.paste(product_img, (paste_x, paste_y), product_img)
 
+        # 결과물 출력
         final_img = img.convert("RGB")
-        st.image(final_img, caption="지마켓 산스가 적용된 홍보물!", use_container_width=True)
+        st.image(final_img, caption="신선강화점 전용 쇼카드 미리보기", use_container_width=True)
         
+        # 다운로드 버튼 생성
         buf = io.BytesIO()
         final_img.save(buf, format="JPEG", quality=100) 
         byte_im = buf.getvalue()
         
-        st.download_button(label="📥 고화질 다운로드 (인쇄용)", data=byte_im, file_name="promo_final.jpg", mime="image/jpeg", use_container_width=True)
-        st.success("🎉 지마켓 산스 폰트로 깔끔하게 완성되었습니다!")
+        st.download_button(label="📥 고화질 다운로드 (인쇄용)", data=byte_im, file_name="promo_fresh_final.jpg", mime="image/jpeg", use_container_width=True)
+        st.success("🎉 '신선강화점' 홍보물이 준비되었습니다!")
         
     except FileNotFoundError:
-        st.error(f"⚠️ '{FONT_FILE}' 또는 'template.jpg' 파일이 폴더에 없습니다.")
+        st.error(f"⚠️ '{FONT_FILE}' 또는 'template.jpg' 파일이 깃허브에 업로드되어 있는지 확인해주세요.")
