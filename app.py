@@ -3,178 +3,145 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import requests
 import os
+from duckduckgo_search import DDGS  
 
-# 💡 [설정] Gmarket Sans Bold 폰트 파일명 (파일명이 다를 경우 이 부분만 수정하세요)
+# [설정] Gmarket Sans Bold 폰트 파일명
 FONT_FILE = "GmarketSansBold.ttf"
 
-# 페이지 제목과 아이콘 설정 (웹브라우저 탭에 표시됨)
 st.set_page_config(page_title="GS25 신선강화점 홍보물 제작소", page_icon="🏪", layout="centered", initial_sidebar_state="collapsed")
 
-# 1. 메인 헤더 영역
+if 'selected_image_url' not in st.session_state:
+    st.session_state['selected_image_url'] = None
+
 st.title("🏪✨ 신선강화점 홍보물 제작소")
 st.caption("홍보물 제작에서 해방되세요! 🎉")
 
 st.write("---")
 
-# 2. 정보 입력 영역 (1단 레이아웃으로 모바일 터치 최적화)
 st.subheader("1. 행사 정보 입력")
 event_type = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"])
-duration = st.text_input("행사 기간", value="", placeholder="예: 4/1(화) ~ 4/30(수)")
+duration = st.text_input("행사 기간", value="", placeholder="예: 4/1(화) ~ 4/30(목)")
 
 st.write("") 
 
 st.subheader("2. 상품 정보 입력")
-product_name = st.text_input("상품명", value="", placeholder="예: 신선가득꿀호떡")
+product_name = st.text_input("상품명", value="", placeholder="예: 삼립 신선가득꿀호떡")
 price = st.text_input("가격", value="", placeholder="예: 3개 4,000원")
 
 st.write("---")
 
-# 3. 상품 사진 업로드 영역 (상세 안내 문구 반영)
-with st.expander("📸 3. 상품 사진 넣기 (터치해서 열기)", expanded=True):
-    # PC 사용자 가이드
-    st.markdown("**(PC 접속 시)** 구글 \"XXX 누끼\"로 검색 후 이미지 \"링크\" 주소 복사 후 붙여넣기")
-    image_url = st.text_input("🔗 이미지 주소 입력", value="", placeholder="https://...")
+st.subheader("📸 3. 상품 사진 선택")
+tab1, tab2, tab3 = st.tabs(["🔍 실시간 이미지 검색", "🤖 AI 자동 생성", "📂 직접 업로드"])
+
+with tab1:
+    st.info("💡 상품명 뒤에 '누끼'를 붙여 검색하면 배경 없는 깔끔한 사진을 찾기 쉽습니다.")
+    search_query = st.text_input("이미지 검색어", value=f"{product_name} 누끼" if product_name else "")
     
-    st.write("---")
-    
-    # 모바일 사용자 가이드
-    st.markdown("**(모바일 접속 시)** 구글 \"XXX 누끼\"로 검색 후 이미지 다운로드 후 업로드")
+    if st.button("🔎 검색 시작"):
+        if search_query:
+            with st.spinner("이미지를 찾는 중..."):
+                try:
+                    with DDGS() as ddgs:
+                        results = [r for r in ddgs.images(search_query, max_results=10)]
+                    
+                    if results:
+                        st.write("마음에 드는 이미지를 클릭하세요:")
+                        cols = st.columns(3)
+                        for idx, result in enumerate(results):
+                            with cols[idx % 3]:
+                                st.image(result['image'], use_container_width=True)
+                                if st.button(f"선택 {idx+1}", key=f"btn_{idx}"):
+                                    st.session_state['selected_image_url'] = result['image']
+                                    st.success(f"{idx+1}번 이미지가 선택되었습니다!")
+                    else:
+                        st.error("검색 결과가 없습니다. 검색어를 바꿔보세요.")
+                except Exception as e:
+                    st.error(f"검색 중 오류가 발생했습니다: {e}")
+        else:
+            st.warning("검색어를 입력해주세요.")
+
+with tab2:
+    st.info("일러스트 느낌의 이미지가 필요할 때 사용하세요.")
+    ai_keyword = st.text_input("AI 작명가", value=product_name if product_name else "")
+    if st.button("✨ AI 이미지 생성"):
+        st.session_state['selected_image_url'] = f"https://image.pollinations.ai/prompt/{ai_keyword},white%20background,3d%20icon?nologo=true"
+        st.image(st.session_state['selected_image_url'], width=200)
+
+with tab3:
     uploaded_image = st.file_uploader("📂 이미지 파일 업로드", type=["jpg", "jpeg", "png"])
 
 st.write("---")
 
-# 4. 홍보물 생성 및 렌더링 영역
 if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
     try:
-        # A4 가로 고해상도 규격 (3508 x 2480)
         A4_W, A4_H = 3508, 2480 
-        
-        # 템플릿 불러오기
         img = Image.open("template.jpg").convert("RGBA")
         img = img.resize((A4_W, A4_H)) 
         draw = ImageDraw.Draw(img)
         
-        # 디자인 수치 고정 (황금 비율)
         USER_MARGIN_PX = 72      
         USER_IMG_SCALE = 1.1     
         USER_TEXT_SCALE = 2.0    
-        
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
         
-        # [데이터 그리기 1] 행사 기간
+        # 💡 [수정 완료] 1. 행사 기간 오토 스케일링 적용
         if duration:
-            font_date = ImageFont.truetype(FONT_FILE, int(A4_W * 0.04))
-            draw.text((margin_right, A4_H * 0.15), f"{duration}", font=font_date, fill=(0, 0, 0), anchor="rm")
+            date_size = int(A4_W * 0.04)
+            font_date = ImageFont.truetype(FONT_FILE, date_size)
+            max_date_width = A4_W * 0.30  # 로고 영역을 침범하지 않게 우측 30% 영역 안으로 최대폭 제한
+            
+            # 행사 기간 글자가 지정된 영역을 넘으면 폰트 크기 자동 축소
+            while draw.textlength(duration, font=font_date) > max_date_width and date_size > 30:
+                date_size -= 2
+                font_date = ImageFont.truetype(FONT_FILE, date_size)
+                
+            draw.text((margin_right, A4_H * 0.15), duration, font=font_date, fill=(0, 0, 0), anchor="rm")
         
-        # [데이터 그리기 2] 행사 종류 로고
+        # 2. 행사 종류
         if event_type != "선택안함":
             promo_filename = f"{event_type}.png"
             if os.path.exists(promo_filename):
                 promo_img = Image.open(promo_filename).convert("RGBA")
-                max_promo_w = int(A4_W * 0.55) 
-                max_promo_h = int(A4_H * 0.26) 
-                
-                aspect_ratio_promo = promo_img.width / promo_img.height
-                target_promo_h = max_promo_h
-                target_promo_w = int(target_promo_h * aspect_ratio_promo)
-                
-                if target_promo_w > max_promo_w:
-                    target_promo_w = max_promo_w
-                    target_promo_h = int(target_promo_w / aspect_ratio_promo)
-                
-                promo_img = promo_img.resize((target_promo_w, target_promo_h), Image.LANCZOS)
-                paste_promo_x = int((A4_W * 0.5) - (target_promo_w / 2)) 
-                paste_promo_y = int((A4_H * 0.28) - target_promo_h) 
-                img.paste(promo_img, (paste_promo_x, paste_promo_y), promo_img)
-            else:
-                # 로고 파일 없을 시 텍스트로 대체
-                font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
-                draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
+                promo_img = promo_img.resize((int(A4_W * 0.4), int(A4_H * 0.2)), Image.LANCZOS)
+                img.paste(promo_img, (int(A4_W * 0.3), int(A4_H * 0.05)), promo_img)
 
-        # [데이터 그리기 3] 상품명 (지마켓 산스 적용)
+        # 3. 상품명
         if product_name:
             title_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
             font_title = ImageFont.truetype(FONT_FILE, title_size)
-            # 가로 폭 넘치면 폰트 크기 자동 조절
             while draw.textlength(product_name, font=font_title) > max_text_width and title_size > 30:
                 title_size -= 2
                 font_title = ImageFont.truetype(FONT_FILE, title_size)
             draw.text((margin_right, A4_H * 0.55), product_name, font=font_title, fill=(0, 0, 0), anchor="rm")
         
-        # [데이터 그리기 4] 가격
+        # 4. 가격
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
-            count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
-            
-            if "캔" in price or "개" in price:
-                split_char = "캔" if "캔" in price else "개"
-                parts = price.split(split_char)
-                count_text = parts[0] + split_char 
-                price_text = parts[1].strip()      
-                
+            font_price = ImageFont.truetype(FONT_FILE, price_size)
+            while draw.textlength(price, font=font_price) > max_text_width and price_size > 40:
+                price_size -= 2
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
-                font_count = ImageFont.truetype(FONT_FILE, count_size)
-                gap = A4_W * 0.02
-                total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
-                
-                while total_width > max_text_width and price_size > 40:
-                    price_size -= 2
-                    count_size -= 1 
-                    font_price = ImageFont.truetype(FONT_FILE, price_size)
-                    font_count = ImageFont.truetype(FONT_FILE, count_size)
-                    total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
-                
-                draw.text((margin_right, A4_H * 0.80), price_text, font=font_price, fill=(220, 20, 20), anchor="rm")
-                price_width = draw.textlength(price_text, font=font_price)
-                draw.text((margin_right - price_width - gap, A4_H * 0.80), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
-            else:
-                font_price = ImageFont.truetype(FONT_FILE, price_size)
-                while draw.textlength(price, font=font_price) > max_text_width and price_size > 40:
-                    price_size -= 2
-                    font_price = ImageFont.truetype(FONT_FILE, price_size)
-                draw.text((margin_right, A4_H * 0.80), price, font=font_price, fill=(220, 20, 20), anchor="rm")
+            draw.text((margin_right, A4_H * 0.80), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
-        # [데이터 그리기 5] 상품 이미지 처리
-        product_img = None
-        if image_url:
-            try:
-                response = requests.get(image_url)
-                product_img = Image.open(io.BytesIO(response.content)).convert("RGBA")
-            except: pass
-        elif uploaded_image:
-            product_img = Image.open(uploaded_image).convert("RGBA")
-            
-        if product_img:
-            max_img_w = int(A4_W * 0.35 * USER_IMG_SCALE)
-            max_img_h = int(A4_H * 0.45 * USER_IMG_SCALE)
-            
-            img_w, img_h = product_img.size
-            aspect_ratio = img_w / img_h
-            
-            target_h = max_img_h
-            target_w = int(target_h * aspect_ratio)
-            
-            if target_w > max_img_w:
-                target_w = max_img_w
-                target_h = int(target_w / aspect_ratio)
-                
-            product_img = product_img.resize((target_w, target_h), Image.LANCZOS)
-            paste_x = int((A4_W * 0.25) - (target_w / 2)) 
-            paste_y = int((A4_H * 0.65) - (target_h / 2)) 
-            img.paste(product_img, (paste_x, paste_y), product_img)
+        # 5. 이미지 합성 
+        final_product_img = None
+        if uploaded_image:
+            final_product_img = Image.open(uploaded_image).convert("RGBA")
+        elif st.session_state['selected_image_url']:
+            res = requests.get(st.session_state['selected_image_url'])
+            final_product_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
 
-        # 결과물 출력
+        if final_product_img:
+            final_product_img.thumbnail((int(A4_W * 0.45), int(A4_H * 0.55)), Image.LANCZOS)
+            img.paste(final_product_img, (int(A4_W * 0.05), int(A4_H * 0.4)), final_product_img)
+
         final_img = img.convert("RGB")
-        st.image(final_img, caption="신선강화점 전용 쇼카드 미리보기", use_container_width=True)
+        st.image(final_img, use_container_width=True)
         
-        # 다운로드 버튼 생성
         buf = io.BytesIO()
-        final_img.save(buf, format="JPEG", quality=100) 
-        byte_im = buf.getvalue()
+        final_img.save(buf, format="JPEG", quality=100)
+        st.download_button("📥 고화질 다운로드", buf.getvalue(), "promo.jpg", "image/jpeg", use_container_width=True)
         
-        st.download_button(label="📥 고화질 다운로드 (인쇄용)", data=byte_im, file_name="promo_fresh_final.jpg", mime="image/jpeg", use_container_width=True)
-        st.success("🎉 '신선강화점' 홍보물이 준비되었습니다!")
-        
-    except FileNotFoundError:
-        st.error(f"⚠️ '{FONT_FILE}' 또는 'template.jpg' 파일이 깃허브에 업로드되어 있는지 확인해주세요.")
+    except Exception as e:
+        st.error(f"제작 중 오류 발생: {e}")
