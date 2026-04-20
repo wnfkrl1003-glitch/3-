@@ -16,13 +16,13 @@ st.write("---")
 
 st.subheader("1. 행사 정보 입력")
 event_type = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"])
-# 💡 [핵심 수정 1] 한 줄 입력창을 엔터가 가능한 여러 줄 입력창(text_area)으로 변경!
-duration = st.text_area("행사 기간 (엔터키로 여러 줄 입력 가능)", value="", placeholder="예:\n4/1(월) ~\n12/31(화)", height=80)
+duration = st.text_area("행사 기간 (엔터키로 줄바꿈 가능)", value="", placeholder="예:\n4/1(화) ~\n12/31(화)", height=80)
 
 st.write("") 
 
 st.subheader("2. 상품 정보 입력")
-product_name = st.text_input("상품명", value="", placeholder="예: 신선가득꿀호떡")
+# 💡 [핵심 수정 1] 상품명도 엔터키가 가능한 여러 줄 입력창(text_area)으로 변경!
+product_name = st.text_area("상품명 (엔터키로 줄바꿈 가능)", value="", placeholder="예:\n삼립)나이를 거꾸로\n먹는 떡국 떡", height=100)
 price = st.text_input("가격", value="", placeholder="예: 3개 4,000원")
 
 st.write("---")
@@ -53,24 +53,20 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
         
-        # [데이터 그리기 1] 행사 기간 
-        # 💡 [핵심 수정 2] 여러 줄의 텍스트 폭을 계산하고 우측 정렬(align="right")로 그리기
+        # [데이터 그리기 1] 행사 기간 (멀티라인 대응)
         if duration:
             date_size = int(A4_W * 0.04)
             font_date = ImageFont.truetype(FONT_FILE, date_size)
-            max_date_width = A4_W * 0.35  # 로고 영역 침범 방지
+            max_date_width = A4_W * 0.35 
             
-            # 입력된 텍스트를 엔터(\n) 기준으로 쪼개서 가장 긴 줄의 길이를 계산합니다.
-            lines = duration.split('\n')
-            max_line_width = max([draw.textlength(line, font=font_date) for line in lines])
+            lines_date = duration.split('\n')
+            max_line_w_date = max([draw.textlength(line, font=font_date) for line in lines_date])
             
-            # 가장 긴 줄이 제한 폭을 넘어가면 폰트 크기 축소 (최소 20까지 팍팍 줄임)
-            while max_line_width > max_date_width and date_size > 20:
+            while max_line_w_date > max_date_width and date_size > 20:
                 date_size -= 2
                 font_date = ImageFont.truetype(FONT_FILE, date_size)
-                max_line_width = max([draw.textlength(line, font=font_date) for line in lines])
+                max_line_w_date = max([draw.textlength(line, font=font_date) for line in lines_date])
                 
-            # align="right"를 추가하여 두 줄일 경우 예쁘게 우측 끝선에 맞춰 정렬되도록 합니다.
             draw.text((margin_right, A4_H * 0.15), duration, font=font_date, fill=(0, 0, 0), anchor="rm", align="right")
         
         # [데이터 그리기 2] 행사 종류 로고
@@ -98,13 +94,21 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
         # [데이터 그리기 3] 상품명
+        # 💡 [핵심 수정 2] 상품명도 여러 줄 정렬 및 오토 스케일링 대응
         if product_name:
             title_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
             font_title = ImageFont.truetype(FONT_FILE, title_size)
-            while draw.textlength(product_name, font=font_title) > max_text_width and title_size > 30:
+            
+            lines_title = product_name.split('\n')
+            max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title])
+            
+            while max_line_w_title > max_text_width and title_size > 30:
                 title_size -= 2
                 font_title = ImageFont.truetype(FONT_FILE, title_size)
-            draw.text((margin_right, A4_H * 0.55), product_name, font=font_title, fill=(0, 0, 0), anchor="rm")
+                max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title])
+            
+            # align="right"를 추가하여 우측 끝선 정렬 유지
+            draw.text((margin_right, A4_H * 0.55), product_name, font=font_title, fill=(0, 0, 0), anchor="rm", align="right")
         
         # [데이터 그리기 4] 가격
         if price:
