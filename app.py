@@ -56,7 +56,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         if duration:
             date_size = int(A4_W * 0.04)
             font_date = ImageFont.truetype(FONT_FILE, date_size)
-            max_date_width = A4_W * 0.30  # 로고 침범 방지 (30% 이내)
+            max_date_width = A4_W * 0.30  # 로고 침범 방지
             
             while draw.textlength(duration, font=font_date) > max_date_width and date_size > 30:
                 date_size -= 2
@@ -97,15 +97,14 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_title = ImageFont.truetype(FONT_FILE, title_size)
             draw.text((margin_right, A4_H * 0.55), product_name, font=font_title, fill=(0, 0, 0), anchor="rm")
         
-        # 💡 [핵심 수정] 가격 영역 - 오토 스케일링 및 분리 버그 해결
+        # [데이터 그리기 4] 가격 영역 - 오토 스케일링, 분리 버그, 에러 완벽 해결
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
-            max_price_width = A4_W * 0.45  # 가격 텍스트가 차지할 수 있는 최대 가로 영역 (45% 제한)
+            max_price_width = A4_W * 0.45 
             
             if "캔" in price or "개" in price:
                 split_char = "캔" if "캔" in price else "개"
-                # split(split_char, 1)을 사용하여 '첫 번째' 단위만 자르고, 뒤에 글자가 날아가지 않게 보존합니다.
                 parts = price.split(split_char, 1)
                 count_text = parts[0] + split_char 
                 price_text = parts[1].strip()      
@@ -115,7 +114,6 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 gap = A4_W * 0.02
                 total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
                 
-                # 텍스트가 최대 가로 영역을 넘어가면 크기를 팍팍 줄입니다. (글자가 밖으로 나가지 않게 방어)
                 while total_width > max_price_width and price_size > 30:
                     price_size -= 4
                     count_size -= 2 
@@ -128,11 +126,11 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 draw.text((margin_right - price_width - gap, A4_H * 0.80), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
             else:
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
-                # '개'나 '캔'이 없는 일반 텍스트일 때도 동일하게 길이 방어벽 적용
                 while draw.textlength(price, font=font_price) > max_price_width and price_size > 30:
                     price_size -= 4
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
-                draw.text((margin_right, A4_H * 0.80), price, font_price, fill=(220, 20, 20), anchor="rm")
+                # 💡 [버그 해결] font_price 파라미터 정상 등록 완료
+                draw.text((margin_right, A4_H * 0.80), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
         # [데이터 그리기 5] 상품 이미지 처리
         product_img = None
