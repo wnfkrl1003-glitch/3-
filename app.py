@@ -7,16 +7,13 @@ import os
 # 💡 [설정] Gmarket Sans Bold 폰트 파일명
 FONT_FILE = "GmarketSansBold.ttf"
 
-# 페이지 제목과 아이콘 설정
 st.set_page_config(page_title="GS25 신선강화점 홍보물 제작소", page_icon="🏪", layout="centered", initial_sidebar_state="collapsed")
 
-# 1. 메인 헤더 영역
 st.title("🏪✨ 신선강화점 홍보물 제작소")
 st.caption("홍보물 제작에서 해방되세요! 🎉")
 
 st.write("---")
 
-# 2. 정보 입력 영역
 st.subheader("1. 행사 정보 입력")
 event_type = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"])
 duration = st.text_input("행사 기간", value="", placeholder="예: 4/1(화) ~ 4/30(수)")
@@ -29,7 +26,6 @@ price = st.text_input("가격", value="", placeholder="예: 3개 4,000원")
 
 st.write("---")
 
-# 3. 상품 사진 업로드 영역
 with st.expander("📸 3. 상품 사진 넣기 (터치해서 열기)", expanded=True):
     st.markdown("**(PC 접속 시)** 구글 \"XXX 누끼\"로 검색 후 이미지 \"링크\" 주소 복사 후 붙여넣기")
     image_url = st.text_input("🔗 이미지 주소 입력", value="", placeholder="https://...")
@@ -41,10 +37,8 @@ with st.expander("📸 3. 상품 사진 넣기 (터치해서 열기)", expanded=
 
 st.write("---")
 
-# 4. 홍보물 생성 및 렌더링 영역
 if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
     try:
-        # A4 가로 고해상도 규격 (3508 x 2480)
         A4_W, A4_H = 3508, 2480 
         
         img = Image.open("template.jpg").convert("RGBA")
@@ -58,13 +52,12 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
         
-        # 💡 [핵심 수정] 행사 기간 글자 크기 자동 조절 (오토 스케일링) 적용
+        # [데이터 그리기 1] 행사 기간 (가로 폭 제한 방어벽 적용)
         if duration:
             date_size = int(A4_W * 0.04)
             font_date = ImageFont.truetype(FONT_FILE, date_size)
-            max_date_width = A4_W * 0.30  # 로고를 침범하지 않도록 우측 30% 이내로 길이 제한
+            max_date_width = A4_W * 0.30  # 로고 침범 방지 (30% 이내)
             
-            # 글자가 지정된 영역을 넘어가면 크기를 자동으로 줄임
             while draw.textlength(duration, font=font_date) > max_date_width and date_size > 30:
                 date_size -= 2
                 font_date = ImageFont.truetype(FONT_FILE, date_size)
@@ -104,14 +97,16 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_title = ImageFont.truetype(FONT_FILE, title_size)
             draw.text((margin_right, A4_H * 0.55), product_name, font=font_title, fill=(0, 0, 0), anchor="rm")
         
-        # [데이터 그리기 4] 가격
+        # 💡 [핵심 수정] 가격 영역 - 오토 스케일링 및 분리 버그 해결
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
+            max_price_width = A4_W * 0.45  # 가격 텍스트가 차지할 수 있는 최대 가로 영역 (45% 제한)
             
             if "캔" in price or "개" in price:
                 split_char = "캔" if "캔" in price else "개"
-                parts = price.split(split_char)
+                # split(split_char, 1)을 사용하여 '첫 번째' 단위만 자르고, 뒤에 글자가 날아가지 않게 보존합니다.
+                parts = price.split(split_char, 1)
                 count_text = parts[0] + split_char 
                 price_text = parts[1].strip()      
                 
@@ -120,9 +115,10 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 gap = A4_W * 0.02
                 total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
                 
-                while total_width > max_text_width and price_size > 40:
-                    price_size -= 2
-                    count_size -= 1 
+                # 텍스트가 최대 가로 영역을 넘어가면 크기를 팍팍 줄입니다. (글자가 밖으로 나가지 않게 방어)
+                while total_width > max_price_width and price_size > 30:
+                    price_size -= 4
+                    count_size -= 2 
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
                     font_count = ImageFont.truetype(FONT_FILE, count_size)
                     total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
@@ -132,8 +128,9 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 draw.text((margin_right - price_width - gap, A4_H * 0.80), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
             else:
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
-                while draw.textlength(price, font=font_price) > max_text_width and price_size > 40:
-                    price_size -= 2
+                # '개'나 '캔'이 없는 일반 텍스트일 때도 동일하게 길이 방어벽 적용
+                while draw.textlength(price, font=font_price) > max_price_width and price_size > 30:
+                    price_size -= 4
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
                 draw.text((margin_right, A4_H * 0.80), price, font_price, fill=(220, 20, 20), anchor="rm")
         
@@ -166,11 +163,9 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
             paste_y = int((A4_H * 0.65) - (target_h / 2)) 
             img.paste(product_img, (paste_x, paste_y), product_img)
 
-        # 결과물 출력
         final_img = img.convert("RGB")
         st.image(final_img, caption="신선강화점 전용 쇼카드 미리보기", use_container_width=True)
         
-        # 다운로드 버튼 생성
         buf = io.BytesIO()
         final_img.save(buf, format="JPEG", quality=100) 
         byte_im = buf.getvalue()
