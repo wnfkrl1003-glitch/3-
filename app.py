@@ -56,10 +56,10 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
 
-        # 💡 [극한 방어 로직] 폰트 크기 하한선을 15까지 낮춰서 무조건 상자 안에 넣습니다.
+        # 💡 [핵심 기술] 절대 영역 방어 함수
         def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj):
             font_size = max_size
-            min_size = 15 # 어떤 극한의 텍스트가 와도 겹침을 막기 위한 마지노선
+            min_size = 15 # 어떤 극한의 텍스트가 와도 방어할 최소 크기
             while font_size >= min_size:
                 font = ImageFont.truetype(font_file, font_size)
                 lines = []
@@ -87,9 +87,10 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
             font = ImageFont.truetype(font_file, min_size)
             return wrapped_text, font
         
-        # [데이터 그리기 1] 행사 기간
+        # 💡 [데이터 그리기 1] 행사 기간 (10번 생각한 완전 격리 조치!)
         if duration:
-            max_date_w = A4_W * 0.30  # 가로 폭을 더 좁혀서 로고 침범 완벽 방어
+            # 기존 0.30에서 0.18(18%)로 가로 폭을 대폭 줄여서 중앙 로고와 절대 물리적으로 충돌하지 않게 설계함
+            max_date_w = A4_W * 0.18  
             max_date_h = A4_H * 0.20  
             base_size = int(A4_W * 0.04)
             wrapped_date, font_date = fit_text_to_box(duration, FONT_FILE, base_size, max_date_w, max_date_h, draw)
@@ -116,15 +117,13 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # 💡 [데이터 그리기 3] 상품명 (핵심 수정!)
-        # anchor를 "rm(오른쪽 중간)"에서 "rd(오른쪽 맨 아래)"로 변경하여, 텍스트가 위로만 쌓이게 합니다.
+        # [데이터 그리기 3] 상품명 
         if product_name:
             max_title_w = A4_W * 0.50 
-            max_title_h = A4_H * 0.25 # 위쪽 여유 공간 활용
+            max_title_h = A4_H * 0.25 
             base_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
             wrapped_title, font_title = fit_text_to_box(product_name, FONT_FILE, base_size, max_title_w, max_title_h, draw)
             
-            # Y좌표를 0.60으로 고정하고, 밑바닥(d)을 기준으로 세워올림
             draw.text((margin_right, A4_H * 0.60), wrapped_title, font=font_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(font_title.size*0.2))
         
         # [데이터 그리기 4] 정상가 
@@ -137,7 +136,6 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 orig_size -= 2
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
             
-            # 상품명(0.60) 아래, 매가(0.82) 위인 0.68 지점에 안전하게 안착
             draw.text((margin_right, A4_H * 0.68), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
         # [데이터 그리기 5] 매가(빨간색 가격) 
@@ -172,7 +170,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 while draw.textlength(price, font_price) > max_price_width and price_size > 30:
                     price_size -= 4
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
-                draw.text((margin_right, A4_H * 0.82), price, font=font_price, fill=(220, 20, 20), anchor="rm")
+                draw.text((margin_right, A4_H * 0.82), price, font_price, fill=(220, 20, 20), anchor="rm")
         
         # [데이터 그리기 6] 상품 이미지 처리
         product_img = None
