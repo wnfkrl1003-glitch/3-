@@ -83,11 +83,13 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 font_size -= 2
             return wrapped_text, ImageFont.truetype(font_file, min_size)
 
+        # 1. 행사 기간
         if duration:
             max_date_w, max_date_h = A4_W * 0.25, A4_H * 0.20
             w_date, f_date = fit_text_to_box(duration, FONT_FILE, int(A4_W * 0.04), max_date_w, max_date_h, draw, is_title=False)
             draw.text((margin_right, A4_H * 0.15), w_date, font=f_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(f_date.size*0.2))
         
+        # 2. 로고 크기 보정
         if event_type != "선택안함":
             promo_filename = f"{event_type}.png"
             if os.path.exists(promo_filename):
@@ -108,11 +110,13 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
+        # 3. 상품명
         if product_name:
             max_title_w, max_title_h = A4_W * 0.50, A4_H * 0.18 
             w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_title_w, max_title_h, draw, is_title=True)
             draw.text((margin_right, A4_H * 0.61), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
         
+        # 4. 정상가
         if original_price:
             clean_op = str(original_price).strip()
             if clean_op and not clean_op.endswith("원"):
@@ -125,6 +129,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
             draw.text((margin_right, A4_H * 0.69), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
+        # 5. 매가
         if price:
             clean_p = str(price).strip()
             if clean_p and not clean_p.endswith("원"):
@@ -149,14 +154,31 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                     f_p = ImageFont.truetype(FONT_FILE, p_size)
                 draw.text((margin_right, A4_H * 0.82), price, font=f_p, fill=(220, 20, 20), anchor="rm")
 
+        # 💡 [핵심 수정 완료] 6. 상품 이미지 크기 강제 확대/축소 보정
         if img_source:
             if isinstance(img_source, str) and img_source.startswith("http"):
                 res = requests.get(img_source)
                 p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
             else:
                 p_img = Image.open(img_source).convert("RGBA")
-            p_img.thumbnail((int(A4_W * 0.35 * USER_IMG_SCALE), int(A4_H * 0.45 * USER_IMG_SCALE)), Image.LANCZOS)
-            img.paste(p_img, (int((A4_W * 0.25) - (p_img.width / 2)), int((A4_H * 0.65) - (p_img.height / 2))), p_img)
+            
+            # 작은 이미지도 무조건 황금 비율 상자에 꽉 차게 늘립니다.
+            max_img_w = int(A4_W * 0.35 * USER_IMG_SCALE)
+            max_img_h = int(A4_H * 0.45 * USER_IMG_SCALE)
+            aspect_ratio = p_img.width / p_img.height
+            
+            target_h = max_img_h
+            target_w = int(target_h * aspect_ratio)
+            
+            if target_w > max_img_w:
+                target_w = max_img_w
+                target_h = int(target_w / aspect_ratio)
+                
+            p_img = p_img.resize((target_w, target_h), Image.LANCZOS)
+            
+            paste_x = int((A4_W * 0.25) - (target_w / 2)) 
+            paste_y = int((A4_H * 0.65) - (target_h / 2)) 
+            img.paste(p_img, (paste_x, paste_y), p_img)
 
         return img.convert("RGB")
     except Exception as e:
@@ -255,7 +277,6 @@ with tab_bulk:
                         st.image(item['img_bytes'], use_container_width=True)
 
         st.write("---")
-        # 💡 [핵심 최적화] fpdf 없이 기본 이미지 라이브러리(PIL)의 내장 PDF 기능 사용!
         if st.button("📑 선택한 상품(체크된 항목) PDF로 한 번에 만들기", use_container_width=True):
             if not selected_indices:
                 st.warning("선택된 상품이 없습니다. 왼쪽 체크박스를 확인해주세요.")
@@ -263,24 +284,7 @@ with tab_bulk:
                 with st.spinner("PDF 문서를 굽는 중입니다..."):
                     try:
                         img_list = []
-                        # 체크된 항목의 이미지 바이트 데이터를 PIL 이미지로 변환하여 리스트에 담기
                         for idx in selected_indices:
                             if 'img_bytes' in st.session_state['bulk_data'][idx]:
-                                # PDF 생성을 위해 다시 RGB 모드로 열어줍니다.
                                 img_obj = Image.open(io.BytesIO(st.session_state['bulk_data'][idx]['img_bytes'])).convert("RGB")
-                                img_list.append(img_obj)
-                        
-                        if img_list:
-                            pdf_buf = io.BytesIO()
-                            # 첫 번째 이미지를 기준으로 나머지 이미지들을 페이지로 추가하여 PDF 생성
-                            img_list[0].save(
-                                pdf_buf, 
-                                format="PDF", 
-                                save_all=True, 
-                                append_images=img_list[1:],
-                                resolution=300.0 # 고화질 유지
-                            )
-                            st.download_button("📥 완성된 PDF 다운로드 (인쇄용)", pdf_buf.getvalue(), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
-                            st.success("🎉 PDF 생성이 에러 없이 완벽하게 완료되었습니다!")
-                    except Exception as e:
-                        st.error(f"PDF 생성 중 오류가 발생했습니다: {e}")
+                                img_list.append(img_obj
