@@ -65,7 +65,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
             w_date, f_date = fit_text_to_box(duration, FONT_FILE, int(A4_W * 0.04), max_date_w, max_date_h, draw)
             draw.text((margin_right, A4_H * 0.15), w_date, font=f_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(f_date.size*0.2))
         
-        # 💡 [수정 완료] 2. 로고 크기 강제 확대/축소 로직 복구 (작은 이미지도 꽉 차게)
+        # 2. 로고 크기 강제 확대/축소 로직 (작은 이미지도 꽉 차게)
         if event_type != "선택안함":
             promo_filename = f"{event_type}.png"
             if os.path.exists(promo_filename):
@@ -89,13 +89,13 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # 3. 상품명 (Bottom-up 정렬)
+        # 💡 [수정 완료] 3. 상품명 - 가로선 침범을 막기 위해 최대 높이(h)를 0.18로 제한하고 위치를 0.61로 살짝 내림
         if product_name:
-            max_title_w, max_title_h = A4_W * 0.50, A4_H * 0.25
+            max_title_w, max_title_h = A4_W * 0.50, A4_H * 0.18 
             w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_title_w, max_title_h, draw)
-            draw.text((margin_right, A4_H * 0.60), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
+            draw.text((margin_right, A4_H * 0.61), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
         
-        # 💡 [수정 완료] 4. 정상가 '원' 자동 추가
+        # 4. 정상가 '원' 자동 추가 및 위치(0.69) 소폭 하향
         if original_price:
             clean_op = str(original_price).strip()
             if clean_op and not clean_op.endswith("원"):
@@ -107,9 +107,9 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
             while draw.textlength(orig_text, font=font_orig) > (A4_W * 0.4) and orig_size > 20:
                 orig_size -= 2
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
-            draw.text((margin_right, A4_H * 0.68), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
+            draw.text((margin_right, A4_H * 0.69), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
-        # 💡 [수정 완료] 5. 매가 (빨간색 가격) '원' 자동 추가
+        # 5. 매가 (빨간색 가격) '원' 자동 추가
         if price:
             clean_p = str(price).strip()
             if clean_p and not clean_p.endswith("원"):
