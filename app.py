@@ -113,6 +113,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
             w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_title_w, max_title_h, draw, is_title=True)
             draw.text((margin_right, A4_H * 0.61), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
         
+        # 정상가가 있을 때만 렌더링하도록 조건 유지
         if original_price:
             clean_op = str(original_price).strip()
             if clean_op and not clean_op.endswith("원"):
@@ -155,8 +156,24 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
             else:
                 p_img = Image.open(img_source).convert("RGBA")
-            p_img.thumbnail((int(A4_W * 0.35 * USER_IMG_SCALE), int(A4_H * 0.45 * USER_IMG_SCALE)), Image.LANCZOS)
-            img.paste(p_img, (int((A4_W * 0.25) - (p_img.width / 2)), int((A4_H * 0.65) - (p_img.height / 2))), p_img)
+            
+            max_img_w = int(A4_W * 0.35 * USER_IMG_SCALE)
+            max_img_h = int(A4_H * 0.45 * USER_IMG_SCALE)
+            
+            img_w, img_h = p_img.size
+            aspect_ratio = img_w / img_h
+            
+            target_h = max_img_h
+            target_w = int(target_h * aspect_ratio)
+            
+            if target_w > max_img_w:
+                target_w = max_img_w
+                target_h = int(target_w / aspect_ratio)
+                
+            p_img = p_img.resize((target_w, target_h), Image.LANCZOS)
+            paste_x = int((A4_W * 0.25) - (target_w / 2)) 
+            paste_y = int((A4_H * 0.65) - (target_h / 2)) 
+            img.paste(p_img, (paste_x, paste_y), p_img)
 
         return img.convert("RGB")
     except Exception as e:
@@ -190,10 +207,12 @@ with tab_single:
 with tab_bulk:
     st.subheader("📁 엑셀 데이터 불러오기")
     st.markdown("""
-    엑셀에서 **[행사번호 | 상품명 | 정상가 | 매가]** 4개 열을 복사해서 붙여넣으세요.
-    * **1**: 1+1 / **2**: 2+1 / **3**: 혜택가
+    엑셀에서 데이터를 복사해서 아래에 붙여넣으세요. 정상가는 비워둬도 작동합니다!
+    * **4열 복사:** [행사번호 | 상품명 | 정상가 | 매가]
+    * **3열 복사:** [행사번호 | 상품명 | 매가] (정상가 생략 시)
+    * **행사번호 규칙:** 1 (1+1), 2 (2+1), 3 (혜택가)
     """)
-    bulk_input = st.text_area("데이터 붙여넣기", placeholder="1 신선가득꿀호떡 2000 1000\n2 혜자도시락 5000 4500", height=150)
+    bulk_input = st.text_area("데이터 붙여넣기", placeholder="1\t신선가득꿀호떡\t2000\t1000\n3\t대패삼겹살\t\t7500", height=150)
     
     global_du = st.text_input("공통 행사 기간", placeholder="예: 4/1 ~ 4/30")
 
@@ -202,29 +221,49 @@ with tab_bulk:
             lines = bulk_input.strip().split('\n')
             new_data = []
             event_map = {"1": "1+1", "2": "2+1", "3": "혜택가"}
+            
             for line in lines:
-                parts = line.split()
-                if len(parts) >= 4:
-                    e_type = event_map.get(parts[0], "선택안함")
+                if not line.strip(): 
+                    continue
+                
+                # 💡 [핵심 수정] 엑셀의 '탭(\t)' 복사 규칙을 이용해 빈칸(정상가 누락) 완벽 캐치
+                if '\t' in line:
+                    parts = line.split('\t')
+                else:
+                    parts = line.split()
+                
+                if len(parts) >= 3:
+                    e_type = event_map.get(parts[0].strip(), "선택안함")
+                    
+                    if len(parts) == 3:
+                        # 3열만 복사한 경우 (정상가 아예 누락)
+                        name = parts[1].strip()
+                        orig = ""
+                        sale = parts[2].strip()
+                    else:
+                        # 4열 복사 (정상가 칸이 빈칸인 경우도 포함)
+                        name = parts[1].strip()
+                        orig = parts[2].strip() if parts[2].strip() else ""
+                        sale = parts[3].strip() if len(parts) > 3 else ""
+                        
                     new_data.append({
                         "event": e_type,
-                        "name": parts[1],
-                        "orig": parts[2],
-                        "sale": parts[3]
+                        "name": name,
+                        "orig": orig,
+                        "sale": sale
                     })
+                    
             st.session_state['bulk_data'] = new_data
             
-            # 💡 [추가] 데이터 로드 시 모든 체크박스를 '선택' 상태로 초기화
             for i in range(len(new_data)):
                 st.session_state[f"chk_{i}"] = True
                 
-            st.success(f"총 {len(new_data)}개의 상품 정보를 행사 종류와 함께 불러왔습니다.")
+            st.success(f"총 {len(new_data)}개의 상품 정보를 성공적으로 불러왔습니다.")
 
     if st.session_state['bulk_data']:
         st.write("---")
         st.info("💡 PDF로 합칠 상품만 왼쪽 체크박스를 선택하세요.")
         
-        # 💡 [추가] 전체 선택 / 전체 해제 버튼
         col_btn1, col_btn2, _ = st.columns([1, 1, 3])
         if col_btn1.button("✅ 전체 선택"):
             for i in range(len(st.session_state['bulk_data'])):
@@ -233,69 +272,7 @@ with tab_bulk:
             for i in range(len(st.session_state['bulk_data'])):
                 st.session_state[f"chk_{i}"] = False
         
-        st.write("") # 버튼 아래 약간의 여백
+        st.write("") 
         
         selected_indices = []
-        for i, item in enumerate(st.session_state['bulk_data']):
-            col_sel, col_info = st.columns([0.1, 0.9])
-            
-            with col_sel:
-                st.write("") 
-                # 💡 Streamlit state를 직접 제어하기 위해 value 속성 제거, key만 사용
-                if f"chk_{i}" not in st.session_state:
-                    st.session_state[f"chk_{i}"] = True # 초기값 세팅
-                is_checked = st.checkbox("", key=f"chk_{i}")
-                if is_checked:
-                    selected_indices.append(i)
-            
-            with col_info.expander(f"🛒 {i+1}. [{item['event']}] {item['name']}", expanded=True):
-                c1, c2 = st.columns([1, 1.5])
-                with c1:
-                    st.write(f"**가격:** {item['orig']}원 → {item['sale']}원")
-                    b_link = st.text_input("🔗 이미지 주소", key=f"link_{i}")
-                    b_file = st.file_uploader("📂 사진 업로드", type=["jpg", "png"], key=f"file_{i}")
-                
-                with c2:
-                    current_src = b_file if b_file else (b_link if b_link else None)
-                    
-                    src_sig = f"{b_file.name}_{b_file.size}" if b_file else str(b_link)
-                    current_sig = f"{item['event']}_{item['name']}_{item['orig']}_{item['sale']}_{src_sig}_{global_du}"
-                    
-                    if item.get('sig') != current_sig:
-                        b_res = generate_poster(item['event'], global_du, item['name'], item['orig'], item['sale'], current_src)
-                        if b_res:
-                            buf = io.BytesIO()
-                            b_res.save(buf, format="JPEG", quality=85) 
-                            item['img_bytes'] = buf.getvalue()
-                            item['sig'] = current_sig
-                            b_res.close() 
-                            
-                    if 'img_bytes' in item:
-                        st.image(item['img_bytes'], use_container_width=True)
-
-        st.write("---")
-        if st.button("📑 선택한 상품(체크된 항목) PDF로 한 번에 만들기", use_container_width=True):
-            if not selected_indices:
-                st.warning("선택된 상품이 없습니다. 왼쪽 체크박스를 하나 이상 선택해주세요.")
-            else:
-                with st.spinner("PDF 문서를 굽는 중입니다... (10초 정도 소요될 수 있습니다)"):
-                    try:
-                        img_list = []
-                        for idx in selected_indices:
-                            if 'img_bytes' in st.session_state['bulk_data'][idx]:
-                                img_obj = Image.open(io.BytesIO(st.session_state['bulk_data'][idx]['img_bytes'])).convert("RGB")
-                                img_list.append(img_obj)
-                        
-                        if img_list:
-                            pdf_buf = io.BytesIO()
-                            img_list[0].save(
-                                pdf_buf, 
-                                format="PDF", 
-                                save_all=True, 
-                                append_images=img_list[1:],
-                                resolution=300.0
-                            )
-                            st.download_button("📥 완성된 PDF 다운로드 (인쇄용)", pdf_buf.getvalue(), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
-                            st.success("🎉 PDF 생성이 에러 없이 완벽하게 완료되었습니다!")
-                    except Exception as e:
-                        st.error(f"PDF 생성 중 오류가 발생했습니다: {e}")
+        for i, item in enumerate(st.session_state['
