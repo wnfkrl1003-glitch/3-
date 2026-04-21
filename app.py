@@ -16,12 +16,13 @@ st.write("---")
 
 st.subheader("1. 행사 정보 입력")
 event_type = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"])
-duration = st.text_area("행사 기간", value="", placeholder="예: 4/1(화) ~ 12/31(화)", height=80)
+# 💡 엔터키 사용 가능 안내 추가
+duration = st.text_area("행사 기간 (엔터키로 줄바꿈 가능)", value="", placeholder="예:\n4/1(화) ~\n12/31(화)", height=80)
 
 st.write("") 
 
 st.subheader("2. 상품 정보 입력")
-product_name = st.text_area("상품명", value="", placeholder="예: 삼립)나이를 거꾸로 먹는 떡국 떡", height=100)
+product_name = st.text_area("상품명 (엔터키로 줄바꿈 가능)", value="", placeholder="예:\n삼립)나이를 거꾸로\n먹는 떡국 떡", height=100)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -54,47 +55,22 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         USER_IMG_SCALE = 1.1     
         USER_TEXT_SCALE = 1.6    
         margin_right = A4_W - USER_MARGIN_PX 
-        max_text_width = A4_W * 0.50 
-
-        # 💡 [핵심 기술] 절대 영역 방어 함수
-        def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj):
-            font_size = max_size
-            min_size = 15 # 어떤 극한의 텍스트가 와도 방어할 최소 크기
-            while font_size >= min_size:
-                font = ImageFont.truetype(font_file, font_size)
-                lines = []
-                for paragraph in text.split('\n'):
-                    current_line = ""
-                    for char in paragraph:
-                        test_line = current_line + char
-                        if draw_obj.textlength(test_line, font=font) <= max_w:
-                            current_line = test_line
-                        else:
-                            if current_line:
-                                lines.append(current_line)
-                            current_line = char
-                    if current_line:
-                        lines.append(current_line)
-                
-                wrapped_text = "\n".join(lines)
-                bbox = draw_obj.multiline_textbbox((0, 0), wrapped_text, font=font, spacing=int(font_size*0.2))
-                text_h = bbox[3] - bbox[1]
-                
-                if text_h <= max_h:
-                    return wrapped_text, font
-                font_size -= 2
-                
-            font = ImageFont.truetype(font_file, min_size)
-            return wrapped_text, font
         
-        # 💡 [데이터 그리기 1] 행사 기간 (10번 생각한 완전 격리 조치!)
+        # 💡 [데이터 그리기 1] 행사 기간 (엔터키 기반, 안전 폭 유지)
         if duration:
-            # 기존 0.30에서 0.18(18%)로 가로 폭을 대폭 줄여서 중앙 로고와 절대 물리적으로 충돌하지 않게 설계함
-            max_date_w = A4_W * 0.18  
-            max_date_h = A4_H * 0.20  
-            base_size = int(A4_W * 0.04)
-            wrapped_date, font_date = fit_text_to_box(duration, FONT_FILE, base_size, max_date_w, max_date_h, draw)
-            draw.text((margin_right, A4_H * 0.15), wrapped_date, font=font_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(font_date.size*0.2))
+            date_size = int(A4_W * 0.04)
+            font_date = ImageFont.truetype(FONT_FILE, date_size)
+            max_date_w = A4_W * 0.25 # 로고 영역과 겹치지 않게 안전 폭 설정
+            
+            lines_date = duration.split('\n')
+            max_line_w_date = max([draw.textlength(line, font=font_date) for line in lines_date]) if lines_date else 0
+            
+            while max_line_w_date > max_date_w and date_size > 20:
+                date_size -= 2
+                font_date = ImageFont.truetype(FONT_FILE, date_size)
+                max_line_w_date = max([draw.textlength(line, font=font_date) for line in lines_date])
+                
+            draw.text((margin_right, A4_H * 0.15), duration, font=font_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(font_date.size*0.2))
         
         # [데이터 그리기 2] 행사 종류 로고
         if event_type != "선택안함":
@@ -117,14 +93,22 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # [데이터 그리기 3] 상품명 
+        # 💡 [데이터 그리기 3] 상품명 (엔터키 기반, 위로 쌓이는 구조 유지)
         if product_name:
-            max_title_w = A4_W * 0.50 
-            max_title_h = A4_H * 0.25 
-            base_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
-            wrapped_title, font_title = fit_text_to_box(product_name, FONT_FILE, base_size, max_title_w, max_title_h, draw)
+            title_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
+            font_title = ImageFont.truetype(FONT_FILE, title_size)
+            max_title_w = A4_W * 0.50
             
-            draw.text((margin_right, A4_H * 0.60), wrapped_title, font=font_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(font_title.size*0.2))
+            lines_title = product_name.split('\n')
+            max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title]) if lines_title else 0
+            
+            while max_line_w_title > max_title_w and title_size > 25:
+                title_size -= 2
+                font_title = ImageFont.truetype(FONT_FILE, title_size)
+                max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title])
+            
+            # anchor="rd"를 유지하여 엔터를 많이 쳐도 정상가를 누르지 않고 위쪽 빈 공간으로 텍스트가 자라납니다.
+            draw.text((margin_right, A4_H * 0.60), product_name, font=font_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(font_title.size*0.2))
         
         # [데이터 그리기 4] 정상가 
         if original_price:
@@ -164,7 +148,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 
                 draw.text((margin_right, A4_H * 0.82), price_text, font=font_price, fill=(220, 20, 20), anchor="rm")
                 price_width = draw.textlength(price_text, font_price)
-                draw.text((margin_right - price_width - gap, A4_H * 0.82), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
+                draw.text((margin_right - price_width - gap, A4_H * 0.82), count_text, font_count, fill=(220, 20, 20), anchor="rm")
             else:
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
                 while draw.textlength(price, font_price) > max_price_width and price_size > 30:
