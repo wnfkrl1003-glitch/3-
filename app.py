@@ -56,13 +56,13 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
 
-        # 💡 [핵심 기술] 절대 영역을 벗어나지 않게 하는 마법의 '자동 줄바꿈 & 크기 조절' 함수
+        # 💡 [극한 방어 로직] 폰트 크기 하한선을 15까지 낮춰서 무조건 상자 안에 넣습니다.
         def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj):
             font_size = max_size
-            while font_size > 20: # 최소 폰트 크기 방어선
+            min_size = 15 # 어떤 극한의 텍스트가 와도 겹침을 막기 위한 마지노선
+            while font_size >= min_size:
                 font = ImageFont.truetype(font_file, font_size)
                 lines = []
-                # 사용자가 엔터를 친 부분은 존중하고, 안 친 부분은 글자 단위로 폭을 계산해 강제 줄바꿈
                 for paragraph in text.split('\n'):
                     current_line = ""
                     for char in paragraph:
@@ -77,30 +77,22 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                         lines.append(current_line)
                 
                 wrapped_text = "\n".join(lines)
-                
-                # 생성된 텍스트 덩어리의 실제 높이와 너비 측정
                 bbox = draw_obj.multiline_textbbox((0, 0), wrapped_text, font=font, spacing=int(font_size*0.2))
                 text_h = bbox[3] - bbox[1]
-                text_w = bbox[2] - bbox[0]
                 
-                # 지정된 상자(가로, 세로) 안에 쏙 들어가면 해당 텍스트와 폰트를 반환!
-                if text_h <= max_h and text_w <= max_w:
+                if text_h <= max_h:
                     return wrapped_text, font
-                
-                # 상자를 벗어나면 폰트 크기를 줄여서 다시 시도
                 font_size -= 2
                 
-            font = ImageFont.truetype(font_file, 20)
-            return text, font
+            font = ImageFont.truetype(font_file, min_size)
+            return wrapped_text, font
         
-        # [데이터 그리기 1] 행사 기간 (안전 상자 적용!)
+        # [데이터 그리기 1] 행사 기간
         if duration:
-            max_date_w = A4_W * 0.35  # 로고 침범 안하는 가로 한계선
-            max_date_h = A4_H * 0.15  # 위아래로 차지할 수 있는 세로 한계선
+            max_date_w = A4_W * 0.30  # 가로 폭을 더 좁혀서 로고 침범 완벽 방어
+            max_date_h = A4_H * 0.20  
             base_size = int(A4_W * 0.04)
-            
             wrapped_date, font_date = fit_text_to_box(duration, FONT_FILE, base_size, max_date_w, max_date_h, draw)
-            # spacing 파라미터를 추가해 줄 간격을 보기 좋게 벌려줍니다.
             draw.text((margin_right, A4_H * 0.15), wrapped_date, font=font_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(font_date.size*0.2))
         
         # [데이터 그리기 2] 행사 종류 로고
@@ -124,16 +116,18 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # [데이터 그리기 3] 상품명 (안전 상자 적용!)
+        # 💡 [데이터 그리기 3] 상품명 (핵심 수정!)
+        # anchor를 "rm(오른쪽 중간)"에서 "rd(오른쪽 맨 아래)"로 변경하여, 텍스트가 위로만 쌓이게 합니다.
         if product_name:
             max_title_w = A4_W * 0.50 
-            max_title_h = A4_H * 0.22 
+            max_title_h = A4_H * 0.25 # 위쪽 여유 공간 활용
             base_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
-            
             wrapped_title, font_title = fit_text_to_box(product_name, FONT_FILE, base_size, max_title_w, max_title_h, draw)
-            draw.text((margin_right, A4_H * 0.52), wrapped_title, font=font_title, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(font_title.size*0.2))
+            
+            # Y좌표를 0.60으로 고정하고, 밑바닥(d)을 기준으로 세워올림
+            draw.text((margin_right, A4_H * 0.60), wrapped_title, font=font_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(font_title.size*0.2))
         
-        # [데이터 그리기 4] 정상가 위치
+        # [데이터 그리기 4] 정상가 
         if original_price:
             display_original_price_text = f"정상가 {original_price}"
             orig_size = int(A4_W * 0.02 * USER_TEXT_SCALE)
@@ -142,7 +136,9 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
             while draw.textlength(display_original_price_text, font=font_orig) > max_orig_width and orig_size > 20:
                 orig_size -= 2
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
-            draw.text((margin_right, A4_H * 0.66), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
+            
+            # 상품명(0.60) 아래, 매가(0.82) 위인 0.68 지점에 안전하게 안착
+            draw.text((margin_right, A4_H * 0.68), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
         # [데이터 그리기 5] 매가(빨간색 가격) 
         if price:
@@ -168,15 +164,15 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                     font_count = ImageFont.truetype(FONT_FILE, count_size)
                     total_width = draw.textlength(price_text, font_price) + draw.textlength(count_text, font_count) + gap
                 
-                draw.text((margin_right, A4_H * 0.80), price_text, font=font_price, fill=(220, 20, 20), anchor="rm")
+                draw.text((margin_right, A4_H * 0.82), price_text, font=font_price, fill=(220, 20, 20), anchor="rm")
                 price_width = draw.textlength(price_text, font_price)
-                draw.text((margin_right - price_width - gap, A4_H * 0.80), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
+                draw.text((margin_right - price_width - gap, A4_H * 0.82), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
             else:
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
                 while draw.textlength(price, font_price) > max_price_width and price_size > 30:
                     price_size -= 4
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
-                draw.text((margin_right, A4_H * 0.80), price, font=font_price, fill=(220, 20, 20), anchor="rm")
+                draw.text((margin_right, A4_H * 0.82), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
         # [데이터 그리기 6] 상품 이미지 처리
         product_img = None
