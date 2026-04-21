@@ -65,13 +65,29 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
             w_date, f_date = fit_text_to_box(duration, FONT_FILE, int(A4_W * 0.04), max_date_w, max_date_h, draw)
             draw.text((margin_right, A4_H * 0.15), w_date, font=f_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(f_date.size*0.2))
         
-        # 2. 로고
+        # 💡 [수정 완료] 2. 로고 크기 강제 확대/축소 로직 복구 (작은 이미지도 꽉 차게)
         if event_type != "선택안함":
             promo_filename = f"{event_type}.png"
             if os.path.exists(promo_filename):
                 p_img = Image.open(promo_filename).convert("RGBA")
-                p_img.thumbnail((int(A4_W * 0.55), int(A4_H * 0.26)), Image.LANCZOS)
-                img.paste(p_img, (int((A4_W * 0.5) - (p_img.width / 2)), int((A4_H * 0.28) - p_img.height)), p_img)
+                max_promo_w = int(A4_W * 0.55) 
+                max_promo_h = int(A4_H * 0.26) 
+                aspect_ratio_promo = p_img.width / p_img.height
+                
+                target_promo_h = max_promo_h
+                target_promo_w = int(target_promo_h * aspect_ratio_promo)
+                
+                if target_promo_w > max_promo_w:
+                    target_promo_w = max_promo_w
+                    target_promo_h = int(target_promo_w / aspect_ratio_promo)
+                    
+                p_img = p_img.resize((target_promo_w, target_promo_h), Image.LANCZOS)
+                paste_promo_x = int((A4_W * 0.5) - (target_promo_w / 2)) 
+                paste_promo_y = int((A4_H * 0.28) - target_promo_h) 
+                img.paste(p_img, (paste_promo_x, paste_promo_y), p_img)
+            else:
+                font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
+                draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
         # 3. 상품명 (Bottom-up 정렬)
         if product_name:
@@ -79,9 +95,13 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
             w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_title_w, max_title_h, draw)
             draw.text((margin_right, A4_H * 0.60), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
         
-        # 4. 정상가
+        # 💡 [수정 완료] 4. 정상가 '원' 자동 추가
         if original_price:
-            orig_text = f"정상가 {original_price}"
+            clean_op = str(original_price).strip()
+            if clean_op and not clean_op.endswith("원"):
+                clean_op += "원"
+            
+            orig_text = f"정상가 {clean_op}"
             orig_size = int(A4_W * 0.02 * USER_TEXT_SCALE)
             font_orig = ImageFont.truetype(FONT_FILE, orig_size)
             while draw.textlength(orig_text, font=font_orig) > (A4_W * 0.4) and orig_size > 20:
@@ -89,8 +109,13 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
             draw.text((margin_right, A4_H * 0.68), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
-        # 5. 매가 (빨간색 가격)
+        # 💡 [수정 완료] 5. 매가 (빨간색 가격) '원' 자동 추가
         if price:
+            clean_p = str(price).strip()
+            if clean_p and not clean_p.endswith("원"):
+                clean_p += "원"
+            price = clean_p
+            
             p_size, c_size = int(A4_W * 0.14 * USER_TEXT_SCALE), int(A4_W * 0.06 * USER_TEXT_SCALE)
             if any(unit in price for unit in ["캔", "개"]):
                 unit = "캔" if "캔" in price else "개"
