@@ -16,12 +16,12 @@ st.write("---")
 
 st.subheader("1. 행사 정보 입력")
 event_type = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"])
-duration = st.text_area("행사 기간 (엔터키로 줄바꿈 가능)", value="", placeholder="예:\n4/1(화) ~\n12/31(화)", height=80)
+duration = st.text_area("행사 기간", value="", placeholder="예: 4/1(화) ~ 12/31(화)", height=80)
 
 st.write("") 
 
 st.subheader("2. 상품 정보 입력")
-product_name = st.text_area("상품명 (엔터키로 줄바꿈 가능)", value="", placeholder="예:\n삼립)나이를 거꾸로\n먹는 떡국 떡", height=100)
+product_name = st.text_area("상품명", value="", placeholder="예: 삼립)나이를 거꾸로 먹는 떡국 떡", height=100)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -44,7 +44,6 @@ st.write("---")
 
 if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
     try:
-        # A4 가로 고해상도 규격 (3508 x 2480)
         A4_W, A4_H = 3508, 2480 
         
         img = Image.open("template.jpg").convert("RGBA")
@@ -54,25 +53,55 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         USER_MARGIN_PX = 72      
         USER_IMG_SCALE = 1.1     
         USER_TEXT_SCALE = 1.6    
-        
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
-        
-        # [데이터 그리기 1] 행사 기간
-        if duration:
-            date_size = int(A4_W * 0.04)
-            font_date = ImageFont.truetype(FONT_FILE, date_size)
-            max_date_width = A4_W * 0.35 
-            
-            lines_date = duration.split('\n')
-            max_line_w_date = max([draw.textlength(line, font=font_date) for line in lines_date])
-            
-            while max_line_w_date > max_date_width and date_size > 20:
-                date_size -= 2
-                font_date = ImageFont.truetype(FONT_FILE, date_size)
-                max_line_w_date = max([draw.textlength(line, font=font_date) for line in lines_date])
+
+        # 💡 [핵심 기술] 절대 영역을 벗어나지 않게 하는 마법의 '자동 줄바꿈 & 크기 조절' 함수
+        def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj):
+            font_size = max_size
+            while font_size > 20: # 최소 폰트 크기 방어선
+                font = ImageFont.truetype(font_file, font_size)
+                lines = []
+                # 사용자가 엔터를 친 부분은 존중하고, 안 친 부분은 글자 단위로 폭을 계산해 강제 줄바꿈
+                for paragraph in text.split('\n'):
+                    current_line = ""
+                    for char in paragraph:
+                        test_line = current_line + char
+                        if draw_obj.textlength(test_line, font=font) <= max_w:
+                            current_line = test_line
+                        else:
+                            if current_line:
+                                lines.append(current_line)
+                            current_line = char
+                    if current_line:
+                        lines.append(current_line)
                 
-            draw.text((margin_right, A4_H * 0.15), duration, font=font_date, fill=(0, 0, 0), anchor="rm", align="right")
+                wrapped_text = "\n".join(lines)
+                
+                # 생성된 텍스트 덩어리의 실제 높이와 너비 측정
+                bbox = draw_obj.multiline_textbbox((0, 0), wrapped_text, font=font, spacing=int(font_size*0.2))
+                text_h = bbox[3] - bbox[1]
+                text_w = bbox[2] - bbox[0]
+                
+                # 지정된 상자(가로, 세로) 안에 쏙 들어가면 해당 텍스트와 폰트를 반환!
+                if text_h <= max_h and text_w <= max_w:
+                    return wrapped_text, font
+                
+                # 상자를 벗어나면 폰트 크기를 줄여서 다시 시도
+                font_size -= 2
+                
+            font = ImageFont.truetype(font_file, 20)
+            return text, font
+        
+        # [데이터 그리기 1] 행사 기간 (안전 상자 적용!)
+        if duration:
+            max_date_w = A4_W * 0.35  # 로고 침범 안하는 가로 한계선
+            max_date_h = A4_H * 0.15  # 위아래로 차지할 수 있는 세로 한계선
+            base_size = int(A4_W * 0.04)
+            
+            wrapped_date, font_date = fit_text_to_box(duration, FONT_FILE, base_size, max_date_w, max_date_h, draw)
+            # spacing 파라미터를 추가해 줄 간격을 보기 좋게 벌려줍니다.
+            draw.text((margin_right, A4_H * 0.15), wrapped_date, font=font_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(font_date.size*0.2))
         
         # [데이터 그리기 2] 행사 종류 로고
         if event_type != "선택안함":
@@ -81,15 +110,12 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 promo_img = Image.open(promo_filename).convert("RGBA")
                 max_promo_w = int(A4_W * 0.55) 
                 max_promo_h = int(A4_H * 0.26) 
-                
                 aspect_ratio_promo = promo_img.width / promo_img.height
                 target_promo_h = max_promo_h
                 target_promo_w = int(target_promo_h * aspect_ratio_promo)
-                
                 if target_promo_w > max_promo_w:
                     target_promo_w = max_promo_w
                     target_promo_h = int(target_promo_w / aspect_ratio_promo)
-                
                 promo_img = promo_img.resize((target_promo_w, target_promo_h), Image.LANCZOS)
                 paste_promo_x = int((A4_W * 0.5) - (target_promo_w / 2)) 
                 paste_promo_y = int((A4_H * 0.28) - target_promo_h) 
@@ -98,35 +124,27 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # 💡 [핵심 업데이트 1] 상품명 위치를 다시 약간 아래(0.52 지점)로 내려서 선과 간격 확보
+        # [데이터 그리기 3] 상품명 (안전 상자 적용!)
         if product_name:
-            title_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
-            font_title = ImageFont.truetype(FONT_FILE, title_size)
+            max_title_w = A4_W * 0.50 
+            max_title_h = A4_H * 0.22 
+            base_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
             
-            lines_title = product_name.split('\n')
-            max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title])
-            
-            while max_line_w_title > max_text_width and title_size > 30:
-                title_size -= 2
-                font_title = ImageFont.truetype(FONT_FILE, title_size)
-                max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title])
-            
-            draw.text((margin_right, A4_H * 0.52), product_name, font=font_title, fill=(0, 0, 0), anchor="rm", align="right")
+            wrapped_title, font_title = fit_text_to_box(product_name, FONT_FILE, base_size, max_title_w, max_title_h, draw)
+            draw.text((margin_right, A4_H * 0.52), wrapped_title, font=font_title, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(font_title.size*0.2))
         
-        # 💡 [핵심 업데이트 2] 정상가 위치를 상품명과 매가 사이 정중앙(0.66 지점)으로 배치
+        # [데이터 그리기 4] 정상가 위치
         if original_price:
             display_original_price_text = f"정상가 {original_price}"
             orig_size = int(A4_W * 0.02 * USER_TEXT_SCALE)
             font_orig = ImageFont.truetype(FONT_FILE, orig_size)
             max_orig_width = A4_W * 0.40  
-            
             while draw.textlength(display_original_price_text, font=font_orig) > max_orig_width and orig_size > 20:
                 orig_size -= 2
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
-                
             draw.text((margin_right, A4_H * 0.66), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
-        # [데이터 그리기 4] 매가(빨간색 가격) 위치는 0.80 지점 그대로 유지
+        # [데이터 그리기 5] 매가(빨간색 가격) 
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
@@ -160,7 +178,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
                 draw.text((margin_right, A4_H * 0.80), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
-        # [데이터 그리기 5] 상품 이미지 처리
+        # [데이터 그리기 6] 상품 이미지 처리
         product_img = None
         if image_url:
             try:
