@@ -149,31 +149,14 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                     f_p = ImageFont.truetype(FONT_FILE, p_size)
                 draw.text((margin_right, A4_H * 0.82), price, font=f_p, fill=(220, 20, 20), anchor="rm")
 
-        # 💡 [핵심 수정] 상품 이미지 강제 확대/축소 비율 계산식 복구!
         if img_source:
             if isinstance(img_source, str) and img_source.startswith("http"):
                 res = requests.get(img_source)
                 p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
             else:
                 p_img = Image.open(img_source).convert("RGBA")
-                
-            max_img_w = int(A4_W * 0.35 * USER_IMG_SCALE)
-            max_img_h = int(A4_H * 0.45 * USER_IMG_SCALE)
-            
-            img_w, img_h = p_img.size
-            aspect_ratio = img_w / img_h
-            
-            target_h = max_img_h
-            target_w = int(target_h * aspect_ratio)
-            
-            if target_w > max_img_w:
-                target_w = max_img_w
-                target_h = int(target_w / aspect_ratio)
-                
-            p_img = p_img.resize((target_w, target_h), Image.LANCZOS)
-            paste_x = int((A4_W * 0.25) - (target_w / 2)) 
-            paste_y = int((A4_H * 0.65) - (target_h / 2)) 
-            img.paste(p_img, (paste_x, paste_y), p_img)
+            p_img.thumbnail((int(A4_W * 0.35 * USER_IMG_SCALE), int(A4_H * 0.45 * USER_IMG_SCALE)), Image.LANCZOS)
+            img.paste(p_img, (int((A4_W * 0.25) - (p_img.width / 2)), int((A4_H * 0.65) - (p_img.height / 2))), p_img)
 
         return img.convert("RGB")
     except Exception as e:
@@ -230,11 +213,27 @@ with tab_bulk:
                         "sale": parts[3]
                     })
             st.session_state['bulk_data'] = new_data
+            
+            # 💡 [추가] 데이터 로드 시 모든 체크박스를 '선택' 상태로 초기화
+            for i in range(len(new_data)):
+                st.session_state[f"chk_{i}"] = True
+                
             st.success(f"총 {len(new_data)}개의 상품 정보를 행사 종류와 함께 불러왔습니다.")
 
     if st.session_state['bulk_data']:
         st.write("---")
         st.info("💡 PDF로 합칠 상품만 왼쪽 체크박스를 선택하세요.")
+        
+        # 💡 [추가] 전체 선택 / 전체 해제 버튼
+        col_btn1, col_btn2, _ = st.columns([1, 1, 3])
+        if col_btn1.button("✅ 전체 선택"):
+            for i in range(len(st.session_state['bulk_data'])):
+                st.session_state[f"chk_{i}"] = True
+        if col_btn2.button("🚫 전체 해제"):
+            for i in range(len(st.session_state['bulk_data'])):
+                st.session_state[f"chk_{i}"] = False
+        
+        st.write("") # 버튼 아래 약간의 여백
         
         selected_indices = []
         for i, item in enumerate(st.session_state['bulk_data']):
@@ -242,7 +241,10 @@ with tab_bulk:
             
             with col_sel:
                 st.write("") 
-                is_checked = st.checkbox("", value=True, key=f"chk_{i}")
+                # 💡 Streamlit state를 직접 제어하기 위해 value 속성 제거, key만 사용
+                if f"chk_{i}" not in st.session_state:
+                    st.session_state[f"chk_{i}"] = True # 초기값 세팅
+                is_checked = st.checkbox("", key=f"chk_{i}")
                 if is_checked:
                     selected_indices.append(i)
             
@@ -274,7 +276,7 @@ with tab_bulk:
         st.write("---")
         if st.button("📑 선택한 상품(체크된 항목) PDF로 한 번에 만들기", use_container_width=True):
             if not selected_indices:
-                st.warning("선택된 상품이 없습니다. 왼쪽 체크박스를 확인해주세요.")
+                st.warning("선택된 상품이 없습니다. 왼쪽 체크박스를 하나 이상 선택해주세요.")
             else:
                 with st.spinner("PDF 문서를 굽는 중입니다... (10초 정도 소요될 수 있습니다)"):
                     try:
