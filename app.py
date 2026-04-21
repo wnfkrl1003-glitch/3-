@@ -51,16 +51,14 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         img = img.resize((A4_W, A4_H)) 
         draw = ImageDraw.Draw(img)
         
-        # OFC님과 함께 찾은 디자인 수치 고정 (황금 비율)
         USER_MARGIN_PX = 72      
         USER_IMG_SCALE = 1.1     
-        # 💡 [핵심 업데이트 1] 글자 크기 스케일을 2.0에서 1.6으로 축소하여 겹침 방지!
         USER_TEXT_SCALE = 1.6    
         
         margin_right = A4_W - USER_MARGIN_PX 
         max_text_width = A4_W * 0.50 
         
-        # [데이터 그리기 1] 행사 기간 (멀티라인 대응)
+        # [데이터 그리기 1] 행사 기간
         if duration:
             date_size = int(A4_W * 0.04)
             font_date = ImageFont.truetype(FONT_FILE, date_size)
@@ -100,7 +98,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # 💡 [핵심 업데이트 2] 상품명 위치를 상단으로 조금 이동하여 세로 여백 확보
+        # 💡 [핵심 업데이트 1] 상품명 위치를 다시 약간 아래(0.52 지점)로 내려서 선과 간격 확보
         if product_name:
             title_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
             font_title = ImageFont.truetype(FONT_FILE, title_size)
@@ -113,25 +111,22 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_title = ImageFont.truetype(FONT_FILE, title_size)
                 max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title])
             
-            draw.text((margin_right, A4_H * 0.45), product_name, font=font_title, fill=(0, 0, 0), anchor="rm", align="right")
+            draw.text((margin_right, A4_H * 0.52), product_name, font=font_title, fill=(0, 0, 0), anchor="rm", align="right")
         
-        # 💡 [핵심 업데이트 3] 정상가 영역 - 오토 스케일링, 위치 최적화, 겹침 원천 차단
+        # 💡 [핵심 업데이트 2] 정상가 위치를 상품명과 매가 사이 정중앙(0.66 지점)으로 배치
         if original_price:
             display_original_price_text = f"정상가 {original_price}"
-            # 정상가 글자 크기를 상품명의 절반 수준으로 팍팍 축소!
             orig_size = int(A4_W * 0.02 * USER_TEXT_SCALE)
             font_orig = ImageFont.truetype(FONT_FILE, orig_size)
-            max_orig_width = A4_W * 0.40  # 로고 침범 방지 (30% 이내)
+            max_orig_width = A4_W * 0.40  
             
-            # 정상가 글자가 지정된 영역을 넘으면 글씨 크기를 팍팍 줄입니다.
             while draw.textlength(display_original_price_text, font=font_orig) > max_orig_width and orig_size > 20:
                 orig_size -= 2
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
                 
-            # 매가(빨간색 가격)보다 훨씬 위쪽에 배치하여 겹침을 완벽하게 차단합니다.
-            draw.text((margin_right, A4_H * 0.57), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
+            draw.text((margin_right, A4_H * 0.66), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
-        # [데이터 그리기 4] 매가(빨간색 가격) 영역 - 오토 스케일링, 분리 버그, 에러 완벽 해결
+        # [데이터 그리기 4] 매가(빨간색 가격) 위치는 0.80 지점 그대로 유지
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
@@ -163,7 +158,6 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 while draw.textlength(price, font_price) > max_price_width and price_size > 30:
                     price_size -= 4
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
-                # 💡 [에러 해결] font_price 파라미터 정상 등록 완료 (팀원분 에러 해결)
                 draw.text((margin_right, A4_H * 0.80), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
         # [데이터 그리기 5] 상품 이미지 처리
