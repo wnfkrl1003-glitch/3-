@@ -16,7 +16,6 @@ st.write("---")
 
 st.subheader("1. 행사 정보 입력")
 event_type = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"])
-# 💡 엔터키 사용 가능 안내 추가
 duration = st.text_area("행사 기간 (엔터키로 줄바꿈 가능)", value="", placeholder="예:\n4/1(화) ~\n12/31(화)", height=80)
 
 st.write("") 
@@ -56,11 +55,11 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
         USER_TEXT_SCALE = 1.6    
         margin_right = A4_W - USER_MARGIN_PX 
         
-        # 💡 [데이터 그리기 1] 행사 기간 (엔터키 기반, 안전 폭 유지)
+        # [데이터 그리기 1] 행사 기간
         if duration:
             date_size = int(A4_W * 0.04)
             font_date = ImageFont.truetype(FONT_FILE, date_size)
-            max_date_w = A4_W * 0.25 # 로고 영역과 겹치지 않게 안전 폭 설정
+            max_date_w = A4_W * 0.25 
             
             lines_date = duration.split('\n')
             max_line_w_date = max([draw.textlength(line, font=font_date) for line in lines_date]) if lines_date else 0
@@ -93,7 +92,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_promo_huge = ImageFont.truetype(FONT_FILE, int(A4_W * 0.16)) 
                 draw.text((A4_W * 0.5, A4_H * 0.20), event_type, font=font_promo_huge, fill=(30, 100, 200), anchor="mm")
 
-        # 💡 [데이터 그리기 3] 상품명 (엔터키 기반, 위로 쌓이는 구조 유지)
+        # [데이터 그리기 3] 상품명
         if product_name:
             title_size = int(A4_W * 0.055 * USER_TEXT_SCALE)
             font_title = ImageFont.truetype(FONT_FILE, title_size)
@@ -107,7 +106,6 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_title = ImageFont.truetype(FONT_FILE, title_size)
                 max_line_w_title = max([draw.textlength(line, font=font_title) for line in lines_title])
             
-            # anchor="rd"를 유지하여 엔터를 많이 쳐도 정상가를 누르지 않고 위쪽 빈 공간으로 텍스트가 자라납니다.
             draw.text((margin_right, A4_H * 0.60), product_name, font=font_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(font_title.size*0.2))
         
         # [데이터 그리기 4] 정상가 
@@ -122,7 +120,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
             
             draw.text((margin_right, A4_H * 0.68), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
-        # [데이터 그리기 5] 매가(빨간색 가격) 
+        # 💡 [데이터 그리기 5] 매가(빨간색 가격) - 누락되었던 font= 복구 완료!
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
@@ -137,24 +135,26 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
                 font_count = ImageFont.truetype(FONT_FILE, count_size)
                 gap = A4_W * 0.02
-                total_width = draw.textlength(price_text, font_price) + draw.textlength(count_text, font_count) + gap
+                total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
                 
                 while total_width > max_price_width and price_size > 30:
                     price_size -= 4
                     count_size -= 2 
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
                     font_count = ImageFont.truetype(FONT_FILE, count_size)
-                    total_width = draw.textlength(price_text, font_price) + draw.textlength(count_text, font_count) + gap
+                    total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
                 
+                # 수정: font_price -> font=font_price, font_count -> font=font_count
                 draw.text((margin_right, A4_H * 0.82), price_text, font=font_price, fill=(220, 20, 20), anchor="rm")
-                price_width = draw.textlength(price_text, font_price)
-                draw.text((margin_right - price_width - gap, A4_H * 0.82), count_text, font_count, fill=(220, 20, 20), anchor="rm")
+                price_width = draw.textlength(price_text, font=font=font_price)
+                draw.text((margin_right - price_width - gap, A4_H * 0.82), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
             else:
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
-                while draw.textlength(price, font_price) > max_price_width and price_size > 30:
+                while draw.textlength(price, font=font_price) > max_price_width and price_size > 30:
                     price_size -= 4
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
-                draw.text((margin_right, A4_H * 0.82), price, font_price, fill=(220, 20, 20), anchor="rm")
+                # 수정: font_price -> font=font_price
+                draw.text((margin_right, A4_H * 0.82), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
         # [데이터 그리기 6] 상품 이미지 처리
         product_img = None
