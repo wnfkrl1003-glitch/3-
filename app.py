@@ -149,14 +149,31 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                     f_p = ImageFont.truetype(FONT_FILE, p_size)
                 draw.text((margin_right, A4_H * 0.82), price, font=f_p, fill=(220, 20, 20), anchor="rm")
 
+        # 💡 [핵심 수정] 상품 이미지 강제 확대/축소 비율 계산식 복구!
         if img_source:
             if isinstance(img_source, str) and img_source.startswith("http"):
                 res = requests.get(img_source)
                 p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
             else:
                 p_img = Image.open(img_source).convert("RGBA")
-            p_img.thumbnail((int(A4_W * 0.35 * USER_IMG_SCALE), int(A4_H * 0.45 * USER_IMG_SCALE)), Image.LANCZOS)
-            img.paste(p_img, (int((A4_W * 0.25) - (p_img.width / 2)), int((A4_H * 0.65) - (p_img.height / 2))), p_img)
+                
+            max_img_w = int(A4_W * 0.35 * USER_IMG_SCALE)
+            max_img_h = int(A4_H * 0.45 * USER_IMG_SCALE)
+            
+            img_w, img_h = p_img.size
+            aspect_ratio = img_w / img_h
+            
+            target_h = max_img_h
+            target_w = int(target_h * aspect_ratio)
+            
+            if target_w > max_img_w:
+                target_w = max_img_w
+                target_h = int(target_w / aspect_ratio)
+                
+            p_img = p_img.resize((target_w, target_h), Image.LANCZOS)
+            paste_x = int((A4_W * 0.25) - (target_w / 2)) 
+            paste_y = int((A4_H * 0.65) - (target_h / 2)) 
+            img.paste(p_img, (paste_x, paste_y), p_img)
 
         return img.convert("RGB")
     except Exception as e:
@@ -255,7 +272,6 @@ with tab_bulk:
                         st.image(item['img_bytes'], use_container_width=True)
 
         st.write("---")
-        # 💡 에러의 주범이었던 괄호 누락 완벽 해결!
         if st.button("📑 선택한 상품(체크된 항목) PDF로 한 번에 만들기", use_container_width=True):
             if not selected_indices:
                 st.warning("선택된 상품이 없습니다. 왼쪽 체크박스를 확인해주세요.")
@@ -266,7 +282,7 @@ with tab_bulk:
                         for idx in selected_indices:
                             if 'img_bytes' in st.session_state['bulk_data'][idx]:
                                 img_obj = Image.open(io.BytesIO(st.session_state['bulk_data'][idx]['img_bytes'])).convert("RGB")
-                                img_list.append(img_obj) # 💡 여기서 괄호가 빠져있었습니다. 완벽하게 수정!
+                                img_list.append(img_obj)
                         
                         if img_list:
                             pdf_buf = io.BytesIO()
