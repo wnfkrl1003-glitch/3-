@@ -9,6 +9,7 @@ from fpdf import FPDF
 FONT_FILE = "GmarketSansBold.ttf"
 st.set_page_config(page_title="GS25 신선강화점 홍보물 제작소", page_icon="🏪", layout="centered")
 
+# 세션 상태 초기화 (데이터가 날아가지 않게 보존)
 if 'bulk_data' not in st.session_state:
     st.session_state['bulk_data'] = []
 
@@ -19,7 +20,7 @@ st.write("---")
 
 tab_single, tab_bulk = st.tabs(["📱 단일 상품 제작", "💻 엑셀로 한 번에 만들기"])
 
-# --- [함수] 홍보물 생성 엔진 ---
+# --- [함수] 홍보물 생성 엔진 (완벽 방어 레이아웃 + 스마트 줄바꿈) ---
 def generate_poster(event_type, duration, product_name, original_price, price, img_source):
     try:
         A4_W, A4_H = 3508, 2480 
@@ -99,8 +100,9 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
         if price:
             clean_p = str(price).strip()
             if not clean_p.endswith("원"): clean_p += "원"
-            p_size, c_size = int(A4_W * 0.14 * USER_TEXT_SCALE), int(A4_W * 0.06 * USER_TEXT_SCALE)
+            p_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             f_p = ImageFont.truetype(FONT_FILE, p_size)
+            # 💡 [버그 해결] font= 파라미터 명시
             draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
 
         if img_source:
@@ -118,12 +120,12 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
 
 # --- [탭 1] 단일 제작 ---
 with tab_single:
-    st.info("하나의 상품을 제작합니다.")
+    st.info("하나의 상품을 정밀하게 제작합니다.")
     ev = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"], key="s_ev")
     du = st.text_area("행사 기간", placeholder="예: 4/1~4/30", key="s_du")
     pn = st.text_area("상품명", placeholder="예: 신선가득꿀호떡", key="s_pn")
     op = st.text_input("정상가", key="s_op")
-    sp = st.text_input("매가", key="s_sp")
+    sp = st.text_input("행사 매가", key="s_sp")
     img_f = st.file_uploader("이미지 업로드", type=["jpg", "png"], key="s_file")
     
     if st.button("🚀 홍보물 만들기", use_container_width=True):
@@ -148,50 +150,48 @@ with tab_bulk:
             for line in lines:
                 parts = line.split()
                 if len(parts) >= 4:
-                    new_data.append({"event": event_map.get(parts[0], "선택안함"), "name": parts[1], "orig": parts[2], "sale": parts[3], "selected": True})
+                    new_data.append({"event": event_map.get(parts[0], "선택안함"), "name": parts[1], "orig": parts[2], "sale": parts[3]})
             st.session_state['bulk_data'] = new_data
 
-    # 💡 [핵심] 체크박스 및 PDF 생성 로직
+    # 💡 [핵심] 체크박스 + 개별 사진 입력이 통합된 목록
     if st.session_state['bulk_data']:
         st.write("---")
-        st.info("PDF로 만들고 싶은 상품만 체크하세요.")
+        st.success(f"총 {len(st.session_state['bulk_data'])}개의 상품을 불러왔습니다.")
         
         selected_indices = []
         for i, item in enumerate(st.session_state['bulk_data']):
-            col_check, col_content = st.columns([0.1, 0.9])
-            # 개별 체크박스
-            is_selected = col_check.checkbox("", value=True, key=f"check_{i}")
-            if is_selected:
-                selected_indices.append(i)
-                
-            with col_content.expander(f"{i+1}. [{item['event']}] {item['name']}"):
-                c1, c2 = st.columns([1, 1.5])
-                with c1:
+            # 1. 체크박스와 상품 정보를 한 줄에 배치
+            col_sel, col_info = st.columns([0.1, 0.9])
+            checked = col_sel.checkbox("", value=True, key=f"chk_{i}")
+            if checked: selected_indices.append(i)
+            
+            # 2. 개별 사진을 넣을 수 있는 편집기 (Expander)
+            with col_info.expander(f"🛒 {i+1}. [{item['event']}] {item['name']}"):
+                c_input, c_preview = st.columns([1, 1.2])
+                with c_input:
+                    st.write(f"정상가: {item['orig']} / 매가: {item['sale']}")
                     b_link = st.text_input("🔗 이미지 주소", key=f"link_{i}")
                     b_file = st.file_uploader("📂 사진 업로드", type=["jpg", "png"], key=f"file_{i}")
-                with c2:
+                
+                with c_preview:
                     curr_src = b_file if b_file else (b_link if b_link else None)
                     b_res = generate_poster(item['event'], global_du, item['name'], item['orig'], item['sale'], curr_src)
                     if b_res:
                         st.image(b_res, use_container_width=True)
-                        st.session_state['bulk_data'][i]['img'] = b_res # PDF용 이미지 저장
+                        st.session_state['bulk_data'][i]['img_obj'] = b_res # PDF용 저장
 
-        # 💡 [핵심] 선택한 상품만 PDF로 묶어서 다운로드
-        if st.button("📥 선택한 상품 PDF로 한 번에 만들기", use_container_width=True):
+        # 3. 하단 PDF 생성 버튼
+        if st.button("📥 선택한 상품만 PDF로 한 번에 만들기", use_container_width=True):
             if not selected_indices:
                 st.warning("선택된 상품이 없습니다.")
             else:
-                with st.spinner("PDF 문서를 생성 중입니다..."):
-                    pdf = FPDF(orientation='L', unit='mm', format='A4')
-                    for idx in selected_indices:
-                        if 'img' in st.session_state['bulk_data'][idx]:
-                            poster = st.session_state['bulk_data'][idx]['img']
-                            pdf.add_page()
-                            # PIL 이미지를 바이트로 변환하여 PDF에 삽입
-                            img_byte_arr = io.BytesIO()
-                            poster.save(img_byte_arr, format='JPEG')
-                            pdf.image(img_byte_arr, x=0, y=0, w=297, h=210)
-                    
-                    pdf_output = pdf.output(dest='S').encode('latin-1')
-                    st.download_button("📥 완성된 PDF 다운로드", pdf_output, "GS25_Promos.pdf", "application/pdf", use_container_width=True)
-                    st.success("PDF 생성이 완료되었습니다!")
+                pdf = FPDF(orientation='L', unit='mm', format='A4')
+                for idx in selected_indices:
+                    if 'img_obj' in st.session_state['bulk_data'][idx]:
+                        p_img = st.session_state['bulk_data'][idx]['img_obj']
+                        pdf.add_page()
+                        buf = io.BytesIO()
+                        p_img.save(buf, format='JPEG')
+                        pdf.image(buf, x=0, y=0, w=297, h=210)
+                
+                st.download_button("📥 완성된 PDF 다운로드", pdf.output(dest='S').encode('latin-1'), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
