@@ -8,7 +8,7 @@ import os
 FONT_FILE = "GmarketSansBold.ttf"
 st.set_page_config(page_title="GS25 신선강화점 홍보물 제작소", page_icon="🏪", layout="centered")
 
-# 세션 상태 초기화
+# 세션 상태 초기화 (데이터 보존용)
 if 'bulk_data' not in st.session_state:
     st.session_state['bulk_data'] = []
 
@@ -19,7 +19,7 @@ st.write("---")
 
 tab_single, tab_bulk = st.tabs(["📱 단일 상품 제작", "💻 엑셀로 한 번에 만들기"])
 
-# --- [함수] 홍보물 생성 엔진 ---
+# --- [함수] 홍보물 생성 엔진 (모든 필살기 집약) ---
 def generate_poster(event_type, duration, product_name, original_price, price, img_source):
     try:
         A4_W, A4_H = 3508, 2480 
@@ -32,6 +32,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
         USER_TEXT_SCALE = 1.6    
         margin_right = A4_W - USER_MARGIN_PX 
 
+        # 💡 스마트 줄바꿈 알고리즘 (제조사/스펙 인식)
         def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj, is_title=False):
             font_size = max_size
             min_size = 15
@@ -48,7 +49,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                         if draw_obj.textlength(test_line, font=font) <= max_w:
                             current_line = test_line
                             if is_title:
-                                if char == ' ' or char == ')': last_break_idx = len(current_line) - 1
+                                if char in [' ', ')']: last_break_idx = len(current_line) - 1
                                 elif i + 1 < len(paragraph) and paragraph[i+1] == '(': last_break_idx = len(current_line) - 1
                             i += 1
                         else:
@@ -58,15 +59,12 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                                 current_line = ""
                                 i += 1
                             elif is_title and last_break_idx != -1:
-                                break_char = current_line[last_break_idx]
-                                if break_char == ' ': lines.append(current_line[:last_break_idx])
-                                else: lines.append(current_line[:last_break_idx+1])
+                                lines.append(current_line[:last_break_idx+1])
                                 current_line = current_line[last_break_idx+1:]
                                 last_break_idx = -1 
                             else:
                                 lines.append(current_line)
                                 current_line = ""
-                                last_break_idx = -1
                     if current_line: lines.append(current_line)
                 wrapped_text = "\n".join(lines)
                 bbox = draw_obj.multiline_textbbox((0, 0), wrapped_text, font=font, spacing=int(font_size*0.2))
@@ -74,11 +72,13 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 font_size -= 2
             return wrapped_text, ImageFont.truetype(font_file, min_size)
 
+        # 1. 행사 기간
         if duration:
             max_date_w, max_date_h = A4_W * 0.25, A4_H * 0.20
             w_date, f_date = fit_text_to_box(duration, FONT_FILE, int(A4_W * 0.04), max_date_w, max_date_h, draw)
             draw.text((margin_right, A4_H * 0.15), w_date, font=f_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(f_date.size*0.2))
         
+        # 2. 로고 (확대/축소 비율 유지)
         if event_type != "선택안함":
             promo_filename = f"{event_type}.png"
             if os.path.exists(promo_filename):
@@ -93,32 +93,38 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 p_img = p_img.resize((t_p_w, t_p_h), Image.LANCZOS)
                 img.paste(p_img, (int((A4_W * 0.5) - (t_p_w / 2)), int((A4_H * 0.28) - t_p_h)), p_img)
 
+        # 3. 상품명 (Bottom-up, 가로선 침범 방지)
         if product_name:
             max_t_w, max_t_h = A4_W * 0.50, A4_H * 0.18 
             w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_t_w, max_t_h, draw, is_title=True)
             draw.text((margin_right, A4_H * 0.61), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
         
+        # 4. 정상가 ('원' 자동 추가 및 공란 허용)
         if original_price:
             clean_op = str(original_price).strip()
-            if clean_op and not clean_op.endswith("원"): clean_op += "원"
-            orig_text = f"정상가 {clean_op}"
-            orig_size = int(A4_W * 0.02 * USER_TEXT_SCALE)
-            font_orig = ImageFont.truetype(FONT_FILE, orig_size)
-            while draw.textlength(orig_text, font=font_orig) > (A4_W * 0.4) and orig_size > 20:
-                orig_size -= 2
+            if clean_op:
+                if not clean_op.endswith("원"): clean_op += "원"
+                orig_text = f"정상가 {clean_op}"
+                orig_size = int(A4_W * 0.02 * USER_TEXT_SCALE)
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
-            draw.text((margin_right, A4_H * 0.69), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
+                while draw.textlength(orig_text, font=font_orig) > (A4_W * 0.4) and orig_size > 20:
+                    orig_size -= 2
+                    font_orig = ImageFont.truetype(FONT_FILE, orig_size)
+                draw.text((margin_right, A4_H * 0.69), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
+        # 5. 매가 ('원' 자동 추가)
         if price:
             clean_p = str(price).strip()
-            if clean_p and not clean_p.endswith("원"): clean_p += "원"
-            p_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
-            f_p = ImageFont.truetype(FONT_FILE, p_size)
-            while draw.textlength(clean_p, font=f_p) > (A4_W * 0.45) and p_size > 30:
-                p_size -= 4
+            if clean_p:
+                if not clean_p.endswith("원"): clean_p += "원"
+                p_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
                 f_p = ImageFont.truetype(FONT_FILE, p_size)
-            draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
+                while draw.textlength(clean_p, font=f_p) > (A4_W * 0.45) and p_size > 30:
+                    p_size -= 4
+                    f_p = ImageFont.truetype(FONT_FILE, p_size)
+                draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
 
+        # 6. 이미지 (작은 사진도 꽉 차게 확대)
         if img_source:
             if isinstance(img_source, str) and img_source.startswith("http"):
                 res = requests.get(img_source)
@@ -140,11 +146,11 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
     except Exception as e:
         return None
 
-# --- [탭 1] 단일 제작 ---
+# --- [탭 1] 단일 상품 제작 ---
 with tab_single:
-    ev = st.selectbox("행사 종류 ", ["선택안함", "1+1", "2+1", "혜택가"], key="s_ev")
-    du = st.text_area("행사 기간 ", placeholder="예: 4/1~4/30", height=80, key="s_du")
-    pn = st.text_area("상품명 ", placeholder="예: 삼립)호떡", height=80, key="s_pn")
+    ev = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"], key="s_ev")
+    du = st.text_area("행사 기간", placeholder="예: 4/1~4/30", height=80, key="s_du")
+    pn = st.text_area("상품명", placeholder="예: 삼립)호떡", height=80, key="s_pn")
     col_p1, col_p2 = st.columns(2)
     op = col_p1.text_input("정상가", key="s_op")
     sp = col_p2.text_input("매가", key="s_sp")
@@ -160,6 +166,7 @@ with tab_single:
 
 # --- [탭 2] 엑셀 대량 제작 ---
 with tab_bulk:
+    st.subheader("📁 엑셀 데이터 불러오기")
     bulk_input = st.text_area("데이터 붙여넣기 [행사번호 | 상품명 | 정상가 | 매가]", height=150)
     global_du = st.text_input("공통 행사 기간", placeholder="예: 4/1 ~ 4/30")
 
@@ -169,38 +176,52 @@ with tab_bulk:
             new_data = []
             event_map = {"1": "1+1", "2": "2+1", "3": "혜택가"}
             for line in lines:
+                # 탭 또는 공백으로 데이터 분리
                 parts = line.split('\t') if '\t' in line else line.split()
                 if len(parts) >= 3:
                     e_type = event_map.get(parts[0].strip(), "선택안함")
                     name = parts[1].strip()
-                    orig = parts[2].strip() if len(parts) > 3 else ""
-                    sale = parts[3].strip() if len(parts) > 3 else parts[2].strip()
+                    # 정상가가 공란인지 체크
+                    if len(parts) == 3:
+                        orig, sale = "", parts[2].strip()
+                    else:
+                        orig = parts[2].strip() if parts[2].strip() else ""
+                        sale = parts[3].strip() if len(parts) > 3 else parts[2].strip()
                     new_data.append({"event": e_type, "name": name, "orig": orig, "sale": sale})
             st.session_state['bulk_data'] = new_data
             for i in range(len(new_data)): st.session_state[f"chk_{i}"] = True
 
     if st.session_state['bulk_data']:
-        col_btn1, col_btn2, _ = st.columns([1, 1, 3])
-        if col_btn1.button("✅ 전체 선택"):
+        st.write("---")
+        # 💡 전체 선택/해제 버튼
+        col_all1, col_all2, _ = st.columns([1, 1, 3])
+        if col_all1.button("✅ 전체 선택"):
             for i in range(len(st.session_state['bulk_data'])): st.session_state[f"chk_{i}"] = True
-        if col_btn2.button("🚫 전체 해제"):
+        if col_all2.button("🚫 전체 해제"):
             for i in range(len(st.session_state['bulk_data'])): st.session_state[f"chk_{i}"] = False
         
         selected_indices = []
         for i, item in enumerate(st.session_state['bulk_data']):
             col_sel, col_info = st.columns([0.1, 0.9])
             with col_sel:
+                st.write("") 
                 if f"chk_{i}" not in st.session_state: st.session_state[f"chk_{i}"] = True
                 if st.checkbox("", key=f"chk_{i}"): selected_indices.append(i)
-            with col_info.expander(f"🛒 {i+1}. [{item['event']}] {item['name']}"):
-                c1, c2 = st.columns([1, 1.5])
-                with c1:
+            
+            # 💡 OFC님이 좋아하신 바로 그 디자인: 펼쳐서 입력하고 미리보기 확인!
+            with col_info.expander(f"🛒 {i+1}. [{item['event']}] {item['name']}", expanded=True):
+                c_in, c_pre = st.columns([1, 1.5])
+                with c_in:
+                    st.write(f"가격: {item['orig']} -> {item['sale']}")
                     b_link = st.text_input("🔗 이미지 주소", key=f"link_{i}")
                     b_file = st.file_uploader("📂 사진 업로드", type=["jpg", "png"], key=f"file_{i}")
-                with c2:
+                
+                with c_pre:
                     src = b_file if b_file else (b_link if b_link else None)
                     src_sig = f"{b_file.name}_{b_file.size}" if b_file else str(b_link)
                     sig = f"{item['event']}_{item['name']}_{item['orig']}_{item['sale']}_{src_sig}_{global_du}"
+                    
+                    # 메모리 최적화: 변경사항이 있을 때만 새로 그리기
                     if item.get('sig') != sig:
                         b_res = generate_poster(item['event'], global_du, item['name'], item['orig'], item['sale'], src)
                         if b_res:
@@ -208,18 +229,26 @@ with tab_bulk:
                             b_res.save(buf, format="JPEG", quality=85)
                             item['img_bytes'], item['sig'] = buf.getvalue(), sig
                             b_res.close()
-                    if 'img_bytes' in item: st.image(item['img_bytes'], use_container_width=True)
+                    
+                    if 'img_bytes' in item:
+                        st.image(item['img_bytes'], use_container_width=True)
 
-        if st.button("📑 PDF로 한 번에 만들기", use_container_width=True):
-            if not selected_indices: st.warning("선택된 상품이 없습니다.")
+        st.write("---")
+        if st.button("📑 선택한 상품 PDF로 한 번에 만들기", use_container_width=True):
+            if not selected_indices:
+                st.warning("선택된 상품이 없습니다.")
             else:
                 with st.spinner("PDF 생성 중..."):
-                    img_list = []
-                    for idx in selected_indices:
-                        if 'img_bytes' in st.session_state['bulk_data'][idx]:
-                            img_obj = Image.open(io.BytesIO(st.session_state['bulk_data'][idx]['img_bytes'])).convert("RGB")
-                            img_list.append(img_obj)
-                    if img_list:
-                        pdf_buf = io.BytesIO()
-                        img_list[0].save(pdf_buf, format="PDF", save_all=True, append_images=img_list[1:], resolution=300.0)
-                        st.download_button("📥 PDF 다운로드", pdf_buf.getvalue(), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
+                    try:
+                        img_list = []
+                        for idx in selected_indices:
+                            if 'img_bytes' in st.session_state['bulk_data'][idx]:
+                                img_list.append(Image.open(io.BytesIO(st.session_state['bulk_data'][idx]['img_bytes'])).convert("RGB"))
+                        
+                        if img_list:
+                            pdf_buf = io.BytesIO()
+                            img_list[0].save(pdf_buf, format="PDF", save_all=True, append_images=img_list[1:], resolution=300.0)
+                            st.download_button("📥 완성된 PDF 다운로드", pdf_buf.getvalue(), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
+                            st.success("PDF 생성이 완료되었습니다!")
+                    except Exception as e:
+                        st.error(f"PDF 생성 중 오류 발생: {e}")
