@@ -120,7 +120,7 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
             
             draw.text((margin_right, A4_H * 0.68), display_original_price_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
-        # 💡 [데이터 그리기 5] 매가(빨간색 가격) - 누락되었던 font= 복구 완료!
+        # 💡 [데이터 그리기 5] 매가(빨간색 가격) - 오타(font=font=) 완벽 수정!
         if price:
             price_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
             count_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
@@ -144,16 +144,15 @@ if st.button("🚀 A4 홍보물 뚝딱 만들기", use_container_width=True):
                     font_count = ImageFont.truetype(FONT_FILE, count_size)
                     total_width = draw.textlength(price_text, font=font_price) + draw.textlength(count_text, font=font_count) + gap
                 
-                # 수정: font_price -> font=font_price, font_count -> font=font_count
                 draw.text((margin_right, A4_H * 0.82), price_text, font=font_price, fill=(220, 20, 20), anchor="rm")
-                price_width = draw.textlength(price_text, font=font=font_price)
+                # 👇 문제의 오타 수정 완료!
+                price_width = draw.textlength(price_text, font=font_price)
                 draw.text((margin_right - price_width - gap, A4_H * 0.82), count_text, font=font_count, fill=(220, 20, 20), anchor="rm")
             else:
                 font_price = ImageFont.truetype(FONT_FILE, price_size)
                 while draw.textlength(price, font=font_price) > max_price_width and price_size > 30:
                     price_size -= 4
                     font_price = ImageFont.truetype(FONT_FILE, price_size)
-                # 수정: font_price -> font=font_price
                 draw.text((margin_right, A4_H * 0.82), price, font=font_price, fill=(220, 20, 20), anchor="rm")
         
         # [데이터 그리기 6] 상품 이미지 처리
