@@ -174,11 +174,13 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
     except Exception as e:
         return None
 
-# --- [함수 2] 💡 단톡방 사전예약 엔진 (상품 설명 기능 추가) ---
+# --- [함수 2] 💡 단톡방 사전예약 엔진 (잘림 방지 및 줄바꿈 최적화) ---
 def generate_preorder_poster(store_header, product_name, price, pre_period, pickup_date, description, method, img_source):
     try:
-        W, H = 1080, 1350 
-        img = Image.new('RGB', (W, H), color=(248, 244, 232)) 
+        W = 1080
+        # 💡 [핵심 해결] 고무줄 캔버스: 처음엔 아주 길게(2500px) 만들고 나중에 쓴 만큼만 자릅니다!
+        H_initial = 2500 
+        img = Image.new('RGB', (W, H_initial), color=(248, 244, 232)) 
         draw = ImageDraw.Draw(img)
 
         def wrap_text_centered(text, font, max_w):
@@ -189,9 +191,10 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
                     if draw.textlength(line + char, font=font) <= max_w:
                         line += char
                     else:
-                        lines.append(line)
+                        # 공백을 제거해야 줄바꿈 시 여백 때문에 중앙 정렬이 삐뚤어지는 것을 막을 수 있습니다
+                        lines.append(line.strip())
                         line = char
-                if line: lines.append(line)
+                if line: lines.append(line.strip())
             return "\n".join(lines)
 
         header_font = ImageFont.truetype(FONT_FILE, 45)
@@ -271,14 +274,14 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
             draw.text((text_start_x + 60, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
             current_y += 70
 
-        # 💡 [신규 추가] 4.5 상품 설명란 (수령 일자와 신청 방법 사이)
+        # 4.5 상품 설명란
         if description:
-            current_y += 20
-            desc_font = ImageFont.truetype(FONT_FILE, 42)
+            current_y += 30
+            desc_font = ImageFont.truetype(FONT_FILE, 40)
             w_desc = wrap_text_centered(description, desc_font, 900)
-            bbox_d = draw.multiline_textbbox((0,0), w_desc, font=desc_font, align="center")
-            draw.multiline_text((W/2, current_y), w_desc, font=desc_font, fill=(100, 80, 70), anchor="ma", align="center", spacing=12)
-            current_y += (bbox_d[3] - bbox_d[1]) + 40
+            bbox_d = draw.multiline_textbbox((0,0), w_desc, font=desc_font, align="center", spacing=15)
+            draw.multiline_text((W/2, current_y), w_desc, font=desc_font, fill=(100, 80, 70), anchor="ma", align="center", spacing=15)
+            current_y += (bbox_d[3] - bbox_d[1]) + 50
 
         # 5. 신청 방법 캡슐
         if method:
@@ -311,15 +314,117 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
             if method_icon:
                 img.paste(method_icon, (int(c_x), int(c_y - 25)), method_icon)
                 draw.text((c_x + icon_space, c_y), m_text, font=m_font, fill=(20, 20, 20), anchor="lm")
-            else: draw.text((W/2, c_y), m_text, font=m_font, fill=(20, 20, 20), anchor="mm")
+            else: 
+                draw.text((W/2, c_y), m_text, font=m_font, fill=(20, 20, 20), anchor="mm")
+            
+            current_y = m_box[3] # 캡슐 맨 아래 좌표로 업데이트
+        
+        # 💡 [고무줄 캔버스 마무으리!] 내용이 쓰인 길이만큼만 예쁘게 잘라서 완성합니다.
+        # 인스타그램 비율이 너무 짧아지지 않도록 최소 길이는 1350으로 보장합니다.
+        final_h = max(1350, int(current_y + 100)) # 100은 하단 여백
+        img = img.crop((0, 0, W, final_h))
 
         return img.convert("RGB")
     except Exception as e: return None
 
-# --- [탭 1, 2 로직 생략 없이 유지] ---
-# ... (탭 1, 2 코드는 이전과 동일하게 유지하여 전체 코드를 구성합니다)
+# --- [복구 완료] 탭 1 단일 상품 제작 ---
+with tab_single:
+    ev = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"], key="s_ev")
+    du = st.text_area("행사 기간", placeholder="예: 4/1~4/30", height=80, key="s_du")
+    pn = st.text_area("상품명", placeholder="예: 삼립)호떡", height=80, key="s_pn")
+    col_p1, col_p2 = st.columns(2)
+    op = col_p1.text_input("정상가 (선택사항)", key="s_op", placeholder="예: 2,000")
+    sp = col_p2.text_input("매가", key="s_sp", placeholder="예: 1,000")
+    img_f = st.file_uploader("이미지 업로드", type=["jpg", "png"], key="s_file")
+    if st.button("🚀 일반 홍보물 만들기", use_container_width=True):
+        res = generate_poster(ev, du, pn, op, sp, img_f)
+        if res:
+            st.image(res, use_container_width=True)
+            buf = io.BytesIO()
+            res.save(buf, format="JPEG", quality=90)
+            st.download_button("📥 다운로드", buf.getvalue(), "promo.jpg", "image/jpeg", use_container_width=True)
+            res.close()
 
-# --- [탭 3] 💡 단톡방 사전예약 제작 ---
+# --- [복구 완료] 탭 2 엑셀 대량 제작 ---
+with tab_bulk:
+    st.subheader("📁 엑셀 데이터 불러오기")
+    st.markdown("""
+    엑셀에서 데이터를 복사해서 아래에 붙여넣으세요. **정상가는 비워둬도 작동합니다!**
+    * **4열 복사:** [행사번호 | 상품명 | 정상가 (선택사항) | 매가]
+    * **3열 복사:** [행사번호 | 상품명 | 매가] (정상가 생략 시)
+    """)
+    bulk_input = st.text_area("데이터 붙여넣기", placeholder="1\t꿀호떡\t2000\t1000\n3\t삼겹살\t\t7500", height=150)
+    global_du = st.text_input("공통 행사 기간", placeholder="예: 4/1 ~ 4/30")
+
+    if st.button("📥 데이터 매칭하기"):
+        if bulk_input:
+            lines = bulk_input.strip().split('\n')
+            new_data = []
+            event_map = {"1": "1+1", "2": "2+1", "3": "혜택가"}
+            for line in lines:
+                parts = line.split('\t') if '\t' in line else line.split()
+                if len(parts) >= 3:
+                    e_type = event_map.get(parts[0].strip(), "선택안함")
+                    name = parts[1].strip()
+                    if len(parts) == 3: orig, sale = "", parts[2].strip()
+                    else:
+                        orig = parts[2].strip() if parts[2].strip() else ""
+                        sale = parts[3].strip() if len(parts) > 3 else parts[2].strip()
+                    new_data.append({"event": e_type, "name": name, "orig": orig, "sale": sale})
+            st.session_state['bulk_data'] = new_data
+            for i in range(len(new_data)): st.session_state[f"chk_{i}"] = True
+
+    if st.session_state['bulk_data']:
+        st.write("---")
+        col_all1, col_all2, _ = st.columns([1, 1, 3])
+        if col_all1.button("✅ 전체 선택"):
+            for i in range(len(st.session_state['bulk_data'])): st.session_state[f"chk_{i}"] = True
+        if col_all2.button("🚫 전체 해제"):
+            for i in range(len(st.session_state['bulk_data'])): st.session_state[f"chk_{i}"] = False
+        
+        selected_indices = []
+        for i, item in enumerate(st.session_state['bulk_data']):
+            col_sel, col_info = st.columns([0.1, 0.9])
+            with col_sel:
+                if f"chk_{i}" not in st.session_state: st.session_state[f"chk_{i}"] = True
+                if st.checkbox("", key=f"chk_{i}"): selected_indices.append(i)
+            
+            with col_info.expander(f"🛒 {i+1}. [{item['event']}] {item['name']}", expanded=True):
+                c_in, c_pre = st.columns([1, 1.5])
+                with c_in:
+                    p_text = f"{item['orig']}원 → {item['sale']}원" if item['orig'] else f"{item['sale']}원 (정상가 미기입)"
+                    st.write(f"**가격:** {p_text}")
+                    b_link = st.text_input("🔗 이미지 주소", key=f"link_{i}")
+                    b_file = st.file_uploader("📂 사진 업로드", type=["jpg", "png"], key=f"file_{i}")
+                with c_pre:
+                    src = b_file if b_file else (b_link if b_link else None)
+                    src_sig = f"{b_file.name}_{b_file.size}" if b_file else str(b_link)
+                    sig = f"{item['event']}_{item['name']}_{item['orig']}_{item['sale']}_{src_sig}_{global_du}"
+                    if item.get('sig') != sig:
+                        b_res = generate_poster(item['event'], global_du, item['name'], item['orig'], item['sale'], src)
+                        if b_res:
+                            buf = io.BytesIO()
+                            b_res.save(buf, format="JPEG", quality=85)
+                            item['img_bytes'], item['sig'] = buf.getvalue(), sig
+                            b_res.close()
+                    if 'img_bytes' in item: st.image(item['img_bytes'], use_container_width=True)
+
+        if st.button("📑 선택한 상품 PDF로 한 번에 만들기", use_container_width=True):
+            if not selected_indices: st.warning("선택된 상품이 없습니다.")
+            else:
+                with st.spinner("PDF 생성 중..."):
+                    try:
+                        img_list = []
+                        for idx in selected_indices:
+                            if 'img_bytes' in st.session_state['bulk_data'][idx]:
+                                img_list.append(Image.open(io.BytesIO(st.session_state['bulk_data'][idx]['img_bytes'])).convert("RGB"))
+                        if img_list:
+                            pdf_buf = io.BytesIO()
+                            img_list[0].save(pdf_buf, format="PDF", save_all=True, append_images=img_list[1:], resolution=300.0)
+                            st.download_button("📥 완성된 PDF 다운로드", pdf_buf.getvalue(), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
+                    except Exception as e: st.error(f"PDF 생성 오류: {e}")
+
+# --- [탭 3] 단톡방 사전예약 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 사전예약 홍보물을 만듭니다. '상품 설명'에 소스 동봉, 완판 소식 등을 자유롭게 적어보세요.")
     store_input = st.text_input("🏪 점포명", placeholder="예: 이천중리타운점", key="pre_store")
@@ -332,7 +437,6 @@ with tab_preorder:
     period_pre = col1.text_input("사전예약 기간", placeholder="예: 4/24(금) ~ 4/28(화)", key="pre_per")
     pickup_pre = col2.text_input("수령일자", placeholder="예: 4/30(목)", key="pre_pick")
     
-    # 💡 [신규 추가] 상품 설명란
     desc_pre = st.text_area("📄 상품 설명 (선택사항)", placeholder="예: 전용 소스 동봉 / 1차 완판 화제 상품! / 수량 한정", height=80, key="pre_desc")
     
     method_pre = st.selectbox("신청 방법", ["매장 방문 예약", "우리동네GS 어플 접속", "단체 채팅방 카톡 요청"], key="pre_met")
@@ -343,10 +447,10 @@ with tab_preorder:
     
     if st.button("🚀 단톡방용 사전예약 홍보물 만들기", use_container_width=True):
         src_pre = img_file_pre if img_file_pre else (img_link_pre if img_link_pre else None)
-        # 💡 [업데이트] desc_pre 파라미터 전달
         res_pre = generate_preorder_poster(final_header, pn_pre, price_pre, period_pre, pickup_pre, desc_pre, method_pre, src_pre)
         if res_pre:
             st.image(res_pre, use_container_width=True, caption="단톡방 최적화 세로형 디자인")
             buf_pre = io.BytesIO()
             res_pre.save(buf_pre, format="JPEG", quality=100)
             st.download_button("📥 카톡 공유용 이미지 다운로드", buf_pre.getvalue(), "preorder_promo.jpg", "image/jpeg", use_container_width=True)
+            res_pre.close()
