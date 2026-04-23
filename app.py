@@ -174,27 +174,40 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
     except Exception as e:
         return None
 
-# --- [함수 2] 💡 단톡방 사전예약 엔진 (잘림 방지 및 줄바꿈 최적화) ---
+# --- [함수 2] 💡 단톡방 사전예약 엔진 ---
 def generate_preorder_poster(store_header, product_name, price, pre_period, pickup_date, description, method, img_source):
     try:
         W = 1080
-        # 💡 [핵심 해결] 고무줄 캔버스: 처음엔 아주 길게(2500px) 만들고 나중에 쓴 만큼만 자릅니다!
         H_initial = 2500 
         img = Image.new('RGB', (W, H_initial), color=(248, 244, 232)) 
         draw = ImageDraw.Draw(img)
 
+        # 💡 [핵심 해결] 어절(단어) 단위 스마트 줄바꿈
         def wrap_text_centered(text, font, max_w):
             lines = []
             for para in text.split('\n'):
-                line = ""
-                for char in para:
-                    if draw.textlength(line + char, font=font) <= max_w:
-                        line += char
+                words = para.split(' ') # 띄어쓰기 기준으로 먼저 나눕니다
+                current_line = ""
+                for word in words:
+                    test_line = current_line + (" " if current_line else "") + word
+                    if draw.textlength(test_line, font=font) <= max_w:
+                        current_line = test_line
                     else:
-                        # 공백을 제거해야 줄바꿈 시 여백 때문에 중앙 정렬이 삐뚤어지는 것을 막을 수 있습니다
-                        lines.append(line.strip())
-                        line = char
-                if line: lines.append(line.strip())
+                        if current_line:
+                            lines.append(current_line)
+                            current_line = word
+                        else:
+                            # 단어 하나가 max_w보다 긴 극단적인 경우 글자 단위로 쪼갬
+                            char_line = ""
+                            for char in word:
+                                if draw.textlength(char_line + char, font=font) <= max_w:
+                                    char_line += char
+                                else:
+                                    lines.append(char_line)
+                                    char_line = char
+                            current_line = char_line
+                if current_line:
+                    lines.append(current_line)
             return "\n".join(lines)
 
         header_font = ImageFont.truetype(FONT_FILE, 45)
@@ -317,17 +330,15 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
             else: 
                 draw.text((W/2, c_y), m_text, font=m_font, fill=(20, 20, 20), anchor="mm")
             
-            current_y = m_box[3] # 캡슐 맨 아래 좌표로 업데이트
+            current_y = m_box[3] 
         
-        # 💡 [고무줄 캔버스 마무으리!] 내용이 쓰인 길이만큼만 예쁘게 잘라서 완성합니다.
-        # 인스타그램 비율이 너무 짧아지지 않도록 최소 길이는 1350으로 보장합니다.
-        final_h = max(1350, int(current_y + 100)) # 100은 하단 여백
+        final_h = max(1350, int(current_y + 100)) 
         img = img.crop((0, 0, W, final_h))
 
         return img.convert("RGB")
     except Exception as e: return None
 
-# --- [복구 완료] 탭 1 단일 상품 제작 ---
+# --- [탭 1] 단일 상품 제작 ---
 with tab_single:
     ev = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"], key="s_ev")
     du = st.text_area("행사 기간", placeholder="예: 4/1~4/30", height=80, key="s_du")
@@ -345,7 +356,7 @@ with tab_single:
             st.download_button("📥 다운로드", buf.getvalue(), "promo.jpg", "image/jpeg", use_container_width=True)
             res.close()
 
-# --- [복구 완료] 탭 2 엑셀 대량 제작 ---
+# --- [탭 2] 엑셀 대량 제작 ---
 with tab_bulk:
     st.subheader("📁 엑셀 데이터 불러오기")
     st.markdown("""
