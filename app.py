@@ -174,7 +174,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
     except Exception as e:
         return None
 
-# --- [함수 2] 💡 단톡방 사전예약 엔진 (잘림 방지 및 줄바꿈 최적화) ---
+# --- [함수 2] 💡 단톡방 사전예약 엔진 ---
 def generate_preorder_poster(store_header, product_name, price, pre_period, pickup_date, description, method, img_source):
     try:
         W = 1080
@@ -436,14 +436,8 @@ with tab_bulk:
 # --- [탭 3] 단톡방 사전예약 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 사전예약 홍보물을 만듭니다. '상품 설명'에 소스 동봉, 완판 소식 등을 자유롭게 적어보세요.")
-    
-    # 💡 [맞춤 반영] 예시 문구 0000점 복구 완료!
     store_input = st.text_input("🏪 점포명", placeholder="예: 0000점 (미입력 시 기본 문구 추출)", key="pre_store")
-    
-    if store_input:
-        final_header = f"GS25 {store_input} 사전 예약"
-    else:
-        final_header = "GS25 사전 예약"
+    final_header = f"GS25 {store_input} 사전 예약" if store_input else "GS25 사전 예약"
     
     pn_pre = st.text_area("상품명", placeholder="예: 한우 냉장 육회 200G", height=80, key="pre_pn")
     price_pre = st.text_input("가격 및 할인 조건", placeholder="예: BC카드 구매 시 18,900원", key="pre_pr")
@@ -454,7 +448,6 @@ with tab_preorder:
     
     desc_pre = st.text_area("📄 상품 설명 (선택사항)", placeholder="예: 전용 소스 동봉 / 1차 완판 화제 상품! / 수량 한정", height=80, key="pre_desc")
     
-    # 💡 [맞춤 반영] 신청 방법 문구 직관적으로 변경 완료!
     method_pre = st.selectbox("신청 방법", ["매장 방문 예약", "우리동네GS 어플 접속 후 사전 예약", "단체 채팅방 카톡 요청"], key="pre_met")
     
     st.write("---")
@@ -470,3 +463,26 @@ with tab_preorder:
             res_pre.save(buf_pre, format="JPEG", quality=100)
             st.download_button("📥 카톡 공유용 이미지 다운로드", buf_pre.getvalue(), "preorder_promo.jpg", "image/jpeg", use_container_width=True)
             res_pre.close()
+
+            # 💡 [신규 추가] 카톡 공유용 자동 텍스트 멘트 생성
+            st.write("---")
+            st.subheader("💬 단톡방 공유용 메시지")
+            st.info("아래 텍스트 영역 우측 상단의 '복사' 아이콘을 눌러 홍보 이미지와 함께 단톡방에 바로 올려주세요!")
+
+            kakao_text = f"📢 {final_header} 안내 📢\n\n"
+            if pn_pre: 
+                kakao_text += f"🎁 상품명: {pn_pre}\n"
+            if price_pre: 
+                kakao_text += f"💰 특가가: {price_pre}\n\n"
+            if period_pre: 
+                kakao_text += f"🗓️ 예약 기간: {period_pre}\n"
+            if pickup_pre: 
+                kakao_text += f"📦 수령 일자: {pickup_pre}\n\n"
+            if desc_pre: 
+                kakao_text += f"✨ 상세 안내 ✨\n{desc_pre}\n\n"
+            if method_pre: 
+                kakao_text += f"👉 신청 방법: {method_pre}\n"
+            
+            kakao_text += "\n지금 바로 예약하시고 특별한 혜택을 누려보세요! 🥰"
+
+            st.code(kakao_text, language="text")
