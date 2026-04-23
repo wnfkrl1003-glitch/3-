@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import requests
 import os
+import base64
 
 # 💡 [설정] 폰트 및 기본 설정
 FONT_FILE = "GmarketSansBold.ttf"
@@ -18,6 +19,25 @@ st.caption("홍보물 제작에서 해방되세요! 🎉")
 st.write("---")
 
 tab_single, tab_bulk, tab_preorder = st.tabs(["📱 단일 상품 제작", "💻 엑셀 대량 제작", "🗓️ 단톡방 사전예약"])
+
+# 💡 [핵심 추가] 아이콘 이미지를 빠르게 불러오고 기억하는 캐시 함수
+@st.cache_data
+def get_icon_bytes(url):
+    try:
+        res = requests.get(url, timeout=3)
+        return res.content
+    except:
+        return None
+
+def load_icon(url, size):
+    icon_bytes = get_icon_bytes(url)
+    if icon_bytes:
+        try:
+            img = Image.open(io.BytesIO(icon_bytes)).convert("RGBA")
+            return img.resize(size, Image.LANCZOS)
+        except:
+            return None
+    return None
 
 # --- [공통 함수] 텍스트 스마트 줄바꿈 ---
 def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj, is_title=False):
@@ -59,7 +79,7 @@ def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj, is_title=
         font_size -= 2
     return wrapped_text, ImageFont.truetype(font_file, min_size)
 
-# --- [함수 1] 기존 일반 홍보물 생성 엔진 (가로형) ---
+# --- [함수 1] 기존 일반 홍보물 생성 엔진 ---
 def generate_poster(event_type, duration, product_name, original_price, price, img_source):
     try:
         A4_W, A4_H = 3508, 2480 
@@ -120,11 +140,19 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
 
         if img_source:
-            if isinstance(img_source, str) and img_source.startswith("http"):
-                res = requests.get(img_source)
-                p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
+            if isinstance(img_source, str):
+                if img_source.startswith("http"):
+                    res = requests.get(img_source)
+                    p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
+                elif img_source.startswith("data:image"):
+                    header, encoded = img_source.split(",", 1)
+                    data = base64.b64decode(encoded)
+                    p_img = Image.open(io.BytesIO(data)).convert("RGBA")
+                else:
+                    p_img = Image.open(img_source).convert("RGBA")
             else:
                 p_img = Image.open(img_source).convert("RGBA")
+                
             m_i_w, m_i_h = int(A4_W * 0.35 * USER_IMG_SCALE), int(A4_H * 0.45 * USER_IMG_SCALE)
             i_w, i_h = p_img.size
             i_ratio = i_w / i_h
@@ -140,11 +168,11 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
     except Exception as e:
         return None
 
-# 💡 [함수 2] 단톡방 특화 사전예약 전용 엔진 (세로형 인스타 사이즈)
+# 💡 [함수 2] 단톡방 특화 사전예약 엔진 (이모티콘 이미지 변환 적용)
 def generate_preorder_poster(product_name, price, pre_period, pickup_date, method, img_source):
     try:
-        W, H = 1080, 1350 # 스마트폰 화면에 최적화된 비율
-        img = Image.new('RGB', (W, H), color=(248, 244, 232)) # 따뜻한 베이지 배경
+        W, H = 1080, 1350 
+        img = Image.new('RGB', (W, H), color=(248, 244, 232)) 
         draw = ImageDraw.Draw(img)
 
         def wrap_text_centered(text, font, max_w):
@@ -160,7 +188,7 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
                 if line: lines.append(line)
             return "\n".join(lines)
 
-        # 1. 상품명 (맨 위 중앙)
+        # 1. 상품명
         title_font = ImageFont.truetype(FONT_FILE, 85)
         w_title = wrap_text_centered(product_name, title_font, 950)
         bbox = draw.multiline_textbbox((0,0), w_title, font=title_font, align="center")
@@ -177,18 +205,25 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
             p_h = 80
             pad_x, pad_y = 60, 20
             pill_box = [W/2 - p_w/2 - pad_x, current_y, W/2 + p_w/2 + pad_x, current_y + p_h + pad_y*2]
-            draw.rounded_rectangle(pill_box, radius=40, fill=(139, 20, 20)) # 진한 빨간색
+            draw.rounded_rectangle(pill_box, radius=40, fill=(139, 20, 20)) 
             draw.text((W/2, current_y + pad_y + p_h/2), clean_p, font=price_font, fill=(255, 255, 255), anchor="mm")
             current_y = pill_box[3] + 60
         else:
             current_y += 60
 
-        # 3. 상품 이미지 (가운데 큼직하게)
+        # 3. 상품 이미지
         img_area_h = 450
         if img_source:
-            if isinstance(img_source, str) and img_source.startswith("http"):
-                res = requests.get(img_source)
-                p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
+            if isinstance(img_source, str):
+                if img_source.startswith("http"):
+                    res = requests.get(img_source)
+                    p_img = Image.open(io.BytesIO(res.content)).convert("RGBA")
+                elif img_source.startswith("data:image"):
+                    header, encoded = img_source.split(",", 1)
+                    data = base64.b64decode(encoded)
+                    p_img = Image.open(io.BytesIO(data)).convert("RGBA")
+                else:
+                    p_img = Image.open(img_source).convert("RGBA")
             else:
                 p_img = Image.open(img_source).convert("RGBA")
             
@@ -204,27 +239,63 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
 
         current_y += img_area_h + 80
 
-        # 4. 예약 기간 & 수령 일자 (아이콘 추가)
+        # 4. 예약 기간 & 수령 일자 (압정 핀 아이콘 적용)
         date_font = ImageFont.truetype(FONT_FILE, 45)
         text_start_x = 120
+        
+        # 압정 아이콘(Twemoji) 로드
+        pin_url = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f4cc.png"
+        pin_icon = load_icon(pin_url, (45, 45))
+
         if pre_period:
-            draw.text((text_start_x, current_y), f"📅 사전예약 기간: {pre_period}", font=date_font, fill=(40, 40, 40), anchor="lm")
-            current_y += 70
-        if pickup_date:
-            draw.text((text_start_x, current_y), f"📦 수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
+            if pin_icon:
+                img.paste(pin_icon, (text_start_x, int(current_y - 22)), pin_icon)
+                draw.text((text_start_x + 60, current_y), f"사전예약 기간: {pre_period}", font=date_font, fill=(40, 40, 40), anchor="lm")
+            else:
+                draw.text((text_start_x, current_y), f"사전예약 기간: {pre_period}", font=date_font, fill=(40, 40, 40), anchor="lm")
             current_y += 70
 
-        # 5. 신청 방법 캡슐 (흰색 배경)
+        if pickup_date:
+            if pin_icon:
+                img.paste(pin_icon, (text_start_x, int(current_y - 22)), pin_icon)
+                draw.text((text_start_x + 60, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
+            else:
+                draw.text((text_start_x, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
+            current_y += 70
+
+        # 5. 신청 방법 캡슐 (카카오, GS25, 편의점 로고 자동 적용)
         current_y += 40
         if method:
             m_font = ImageFont.truetype(FONT_FILE, 45)
-            m_text = f"👉 {method}"
+            
+            # 선택된 옵션에 따라 적절한 로고 이미지 URL 할당
+            if "카톡" in method or "채팅방" in method:
+                icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/KakaoTalk_logo.svg/120px-KakaoTalk_logo.svg.png"
+            elif "GS" in method or "어플" in method:
+                icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/GS25_logo_2019.svg/120px-GS25_logo_2019.svg.png"
+            else:
+                icon_url = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3ea.png" # 편의점 이모티콘
+            
+            method_icon = load_icon(icon_url, (50, 50))
+            
+            m_text = method
             m_w = draw.textlength(m_text, font=m_font)
-            m_h = 45
+            icon_space = 65 if method_icon else 0
+            total_content_w = m_w + icon_space
+            
+            m_h = 50
             pad_x, pad_y = 60, 25
-            m_box = [W/2 - m_w/2 - pad_x, current_y, W/2 + m_w/2 + pad_x, current_y + m_h + pad_y*2]
+            m_box = [W/2 - total_content_w/2 - pad_x, current_y, W/2 + total_content_w/2 + pad_x, current_y + m_h + pad_y*2]
             draw.rounded_rectangle(m_box, radius=35, fill=(255, 255, 255))
-            draw.text((W/2, current_y + pad_y + m_h/2), m_text, font=m_font, fill=(20, 20, 20), anchor="mm")
+            
+            center_y = current_y + pad_y + m_h/2
+            content_start_x = W/2 - total_content_w/2
+            
+            if method_icon:
+                img.paste(method_icon, (int(content_start_x), int(center_y - 25)), method_icon)
+                draw.text((content_start_x + icon_space, center_y), m_text, font=m_font, fill=(20, 20, 20), anchor="lm")
+            else:
+                draw.text((W/2, center_y), m_text, font=m_font, fill=(20, 20, 20), anchor="mm")
 
         return img.convert("RGB")
     except Exception as e:
@@ -350,7 +421,7 @@ with tab_preorder:
     method_pre = st.selectbox("신청 방법", ["매장 방문 예약", "우리동네GS 어플 접속", "단체 채팅방 카톡 요청"], key="pre_met")
     
     st.write("---")
-    st.markdown("🖼️ **사진 넣기**: 구글 이미지 링크나 다운로드한 사진을 넣어주세요!")
+    st.markdown("🖼️ **사진 넣기**: 구글 이미지 링크나 다운로드한 사진을 넣어주세요! (Base64 코드도 알아서 해독합니다!)")
     img_link_pre = st.text_input("🔗 이미지 주소", key="pre_link")
     img_file_pre = st.file_uploader("📂 사진 업로드", type=["jpg", "png"], key="pre_file")
     
