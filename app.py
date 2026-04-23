@@ -4,6 +4,7 @@ import io
 import requests
 import os
 import base64
+import streamlit.components.v1 as components # 💡 대형 복사 버튼을 위한 모듈 추가
 
 # 💡 [설정] 폰트 및 기본 설정
 FONT_FILE = "GmarketSansBold.ttf"
@@ -464,16 +465,17 @@ with tab_preorder:
             st.download_button("📥 카톡 공유용 이미지 다운로드", buf_pre.getvalue(), "preorder_promo.jpg", "image/jpeg", use_container_width=True)
             res_pre.close()
 
-            # 💡 [신규 추가] 카톡 공유용 자동 텍스트 멘트 생성
+            # 💡 [핵심 업데이트] 카톡 공유용 자동 텍스트 멘트 (특가 표기 수정 및 대형 버튼 추가)
             st.write("---")
             st.subheader("💬 단톡방 공유용 메시지")
-            st.info("아래 텍스트 영역 우측 상단의 '복사' 아이콘을 눌러 홍보 이미지와 함께 단톡방에 바로 올려주세요!")
+            st.info("아래 노란색 버튼을 누르시면 카톡방에 바로 붙여넣을 수 있도록 내용이 복사됩니다!")
 
             kakao_text = f"📢 {final_header} 안내 📢\n\n"
             if pn_pre: 
                 kakao_text += f"🎁 상품명: {pn_pre}\n"
             if price_pre: 
-                kakao_text += f"💰 특가가: {price_pre}\n\n"
+                # 💡 "특가가" -> "특가"로 깔끔하게 수정 완료
+                kakao_text += f"💰 특가: {price_pre}\n\n"
             if period_pre: 
                 kakao_text += f"🗓️ 예약 기간: {period_pre}\n"
             if pickup_pre: 
@@ -486,3 +488,15 @@ with tab_preorder:
             kakao_text += "\n지금 바로 예약하시고 특별한 혜택을 누려보세요! 🥰"
 
             st.code(kakao_text, language="text")
+            
+            # 💡 버튼을 밖으로 빼서 아주 눈에 잘 띄게 배치
+            safe_text = kakao_text.replace('\n', '\\n').replace('`', '\\`')
+            copy_html = f"""
+            <div style="text-align: center; margin-top: 10px;">
+                <button onclick="navigator.clipboard.writeText(`{safe_text}`).then(() => alert('✅ 복사되었습니다! 카톡방에 그대로 붙여넣기 해주세요.'));" 
+                        style="width: 100%; padding: 15px; font-size: 18px; background-color: #FEE500; color: #3C1E1E; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
+                    📋 카톡 메시지 전체 복사하기
+                </button>
+            </div>
+            """
+            components.html(copy_html, height=80)
