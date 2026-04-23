@@ -139,7 +139,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 if not clean_p.endswith("원"): clean_p += "원"
                 p_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
                 f_p = ImageFont.truetype(FONT_FILE, p_size)
-                while draw.textlength(clean_p, font=f_p) > (A4_W * 0.45) and p_size > 30:
+                while draw.textlength(clean_p, font=f_p) > (A4_W * 0.45) and p_size > 15:
                     p_size -= 4
                     f_p = ImageFont.truetype(FONT_FILE, p_size)
                 draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
@@ -194,36 +194,48 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
                 if line: lines.append(line)
             return "\n".join(lines)
 
-        # 💡 [완벽 수정] 0. 점포 브랜딩 헤더 (가독성 & 레이아웃 최적화)
         header_font = ImageFont.truetype(FONT_FILE, 45)
-        # 글자 크기를 키우고 묵직한 다크 브라운 색상으로 가독성 개선
         draw.text((W/2, 60), store_header, font=header_font, fill=(80, 60, 50), anchor="ma")
         
-        # 글자와 선이 겹치지 않도록 Y좌표를 125로 넉넉하게 내림
         line_y = 125
         draw.line([(120, line_y), (W-120, line_y)], fill=(200, 190, 180), width=3) 
 
-        # 1. 상품명 (구분선 아래로 자연스럽게 배치)
+        # 1. 상품명
         title_font = ImageFont.truetype(FONT_FILE, 85)
         w_title = wrap_text_centered(product_name, title_font, 950)
         bbox = draw.multiline_textbbox((0,0), w_title, font=title_font, align="center")
         title_h = bbox[3] - bbox[1]
         
-        title_start_y = line_y + 45 # 가로선에서 45px 띄워서 시작
+        title_start_y = line_y + 45 
         draw.multiline_text((W/2, title_start_y), w_title, font=title_font, fill=(50, 30, 20), anchor="ma", align="center")
 
-        # 2. 가격 캡슐
+        # 💡 [핵심 해결] 2. 가격 캡슐 (스마트 줄바꿈 및 동적 높이 적용)
         current_y = title_start_y + title_h + 50
         if price:
             clean_p = str(price).strip()
             if clean_p and not clean_p.endswith("원"): clean_p += "원"
-            price_font = ImageFont.truetype(FONT_FILE, 80)
-            p_w = draw.textlength(clean_p, font=price_font)
-            p_h = 80
-            pad_x, pad_y = 60, 20
+            
+            p_size = 80
+            price_font = ImageFont.truetype(FONT_FILE, p_size)
+            max_text_w = W - 180 # 좌우 여백 확보
+            
+            # 먼저 폰트 크기를 조금 줄여봅니다 (가독성을 위해 40까지만 제한)
+            while draw.textlength(clean_p, font=price_font) > max_text_w and p_size > 40:
+                p_size -= 2
+                price_font = ImageFont.truetype(FONT_FILE, p_size)
+                
+            # 그래도 크면 줄바꿈 처리
+            w_price = wrap_text_centered(clean_p, price_font, max_text_w)
+            bbox = draw.multiline_textbbox((0,0), w_price, font=price_font, align="center")
+            p_w = bbox[2] - bbox[0]
+            p_h = bbox[3] - bbox[1]
+            
+            pad_x, pad_y = 60, 25
             pill_box = [W/2 - p_w/2 - pad_x, current_y, W/2 + p_w/2 + pad_x, current_y + p_h + pad_y*2]
+            
             draw.rounded_rectangle(pill_box, radius=40, fill=(139, 20, 20)) 
-            draw.text((W/2, current_y + pad_y + p_h/2), clean_p, font=price_font, fill=(255, 255, 255), anchor="mm")
+            draw.multiline_text((W/2, current_y + pad_y + p_h/2), w_price, font=price_font, fill=(255, 255, 255), anchor="mm", align="center", spacing=15)
+            
             current_y = pill_box[3] + 60
         else:
             current_y += 60
@@ -280,7 +292,7 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
                 draw.text((text_start_x, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
             current_y += 70
 
-        # 5. 신청 방법 캡슐
+        # 5. 신청 방법 캡슐 
         current_y += 40
         if method:
             m_font = ImageFont.truetype(FONT_FILE, 45)
@@ -419,11 +431,10 @@ with tab_bulk:
                             st.download_button("📥 완성된 PDF 다운로드", pdf_buf.getvalue(), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
                     except Exception as e: st.error(f"PDF 생성 오류: {e}")
 
-# --- [탭 3] 💡 단톡방 사전예약 제작 ---
+# --- [탭 3] 단톡방 사전예약 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 사전예약 홍보물을 만듭니다. 점포명을 넣으면 홍보물 상단에 자동 반영됩니다.")
     
-    # 💡 [맞춤 반영] 예시 문구를 이천중리타운점으로 교체
     store_input = st.text_input("🏪 점포명", placeholder="예: 이천중리타운점 (미입력 시 기본 문구 추출)", key="pre_store")
     
     if store_input:
@@ -432,7 +443,7 @@ with tab_preorder:
         final_header = "GS25 사전 예약"
     
     pn_pre = st.text_area("상품명", placeholder="예: 한우 냉장 육회 200G", height=80, key="pre_pn")
-    price_pre = st.text_input("가격 (할인가)", placeholder="예: 18,900", key="pre_pr")
+    price_pre = st.text_input("가격 (할인가)", placeholder="예: BC,농협,삼성 카드 구매 시 18,900원", key="pre_pr")
     
     col1, col2 = st.columns(2)
     period_pre = col1.text_input("사전예약 기간", placeholder="예: 4/24(금) ~ 4/28(화)", key="pre_per")
