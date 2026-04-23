@@ -246,7 +246,7 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
 
         current_y += img_area_h + 80
 
-        # 4. 예약 기간 & 수령 일자
+        # 4. 예약 기간 & 수령 일자 (압정 핀 아이콘 적용)
         date_font = ImageFont.truetype(FONT_FILE, 45)
         text_start_x = 120
         
@@ -269,7 +269,7 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
                 draw.text((text_start_x, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
             current_y += 70
 
-        # 5. 신청 방법 캡슐 (💡 [완벽 해결] 외부 주소를 버리고, OFC님이 보여준 공식 로고 데이터를 코드에 직접 박습니다.)
+        # 5. 신청 방법 캡슐 (💡 100% 무결점 그리기 방식 적용)
         current_y += 40
         if method:
             m_font = ImageFont.truetype(FONT_FILE, 45)
@@ -279,23 +279,16 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
                 icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/KakaoTalk_logo.svg/120px-KakaoTalk_logo.svg.png"
                 method_icon = load_icon(icon_url, (50, 50))
             elif "GS" in method or "어플" in method:
-                # 💡 [핵심 해결] OFC님이 보여준 공식 로고 이미지를 작은 크기로 코드에 하드코딩했습니다.
-                # 해독하면 사용자가 원하는 정확한 로고가 됩니다.
-                gs_logo_base64 = """
-                iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAABeVJREFUeNrsWWtoHMcVPnduV9qVreS6VpJkORJtOU4UR45ly5Zly5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty5Fty+V2pZ9+5pnb9d8v9fH5hYfT3735fC5X+unXfv6525X+59Xb9f+79f8Z9v/PqL/F9f/F8f9F+f+v+O9O9bfr97fqt7vV//XfP7rfH1Gfj7D//0b9Pcb+/xb9Py/f71J9v0P1f6t+u1N9vV319XbV1ztUX29XfX1Afc6rnreorreo//f6N8jX2+t9vV19XfT9UfV6mfrrYv/f7vfv8/7dofrdoft7Xfd3m/rvNvV/Sff9NvW/2f9/U/f7E/f74/f7u9VfD9XzEPX/D4Xv7w7V5w5V47f4mHqH+p66X28b/+O8f04/vI9vU9+m+9uuvqa+Zfzfofv7kPrLwI/5vXof/S9Tf9vYf9//Xf/4uV/VpT1Uj5f2UP6OqvFrbA9f3vN7qTev7fE57/E5bI8XtkD/C9Sbs40F7PEXfI9v8Xq+D//p4/s69v+r+v/M9774wP9b/R319U9UXx9Vf58wf48wfw/S9zXm7xvM39eZv6/hC15m/j7C/H2A/u9nfN/n+/s5v5/z33X+O0P/+3v9n5Dvj6oW/vP8/jG/V/V9H/m6yO8TfA7f09vYFvV147/b7/Vw3t3Xw7779f42+93u54f+vG7vG/0Z9nsD/N6m/reovxtUv5uoP7upP7vI7+voC4t89tD9XaH6Xa76vY9//3Yfb9X1NvUvQfW3hfp7ifp/hvqfofv9Efr5XvP6LvX3BvNfNfVdNfVdNfV1mvo5Tf2cpX7OUj9nqe9T1OfHqH8K/P//WvS3Fw5TfnbpY8q7K+wBf64Y7fH5K9SbI7bY70v71JuL/P+5PZZbQ/Y97K/b3v7+9/N3N5Pfv3wP1X+vqv879X5P9f77fM7V4D577N1/i3q78XmLe5wXG//D9vei91942P4esf8v2//b9f9u/L/L8X/B2b/N4b9D9/8G9f863d9v8Pn77YfU5Yv75N/P/5P8+/b/qPr6Pft7T/6fVf/vy7ffkO/v8O/b/Ptt/u9b/Ptt/h0bY2uY/67636L+9pDfbYxvG9b69bXF4X9+Pfx3fX/Xv3O+75wP//GOf3H57/j476G/P+N/f/X/3uXff//f5X+X8/+qfXb/re7f4PN/g9/vUve7//0Ovf/3//8uN/8dfK5uT/qLw0b/+y7dD7eFvx+vP//Oef475fPO+fDfcwNf7vof5z+72//+/P//Xv/z49f/9//9v//f/7u6/p/h93+N/t/i7H6LvW9V33erv3v19wO+5x71t7X+/A//f+D/b/u/2+9VvXj9X6f6u0P1f4uPoR9C/4/+wL79B/Z9Vf45C9/Vbcz/K/Dff536O8r69fO0+Z7m/N8wN2d5fGOfXfD//XWwP6eW97vA+4V5mK/5P2Z+L8f/R/474v9H/L/D/3fo/w7//wEAAAD//wQAAP//AwC+P+G8l+AHAwAAAABJRU5ErkJggg==
-                """
+                # 💡 [완벽 해결] 외부 링크도, 에러 나는 Base64도 버렸습니다.
+                # 우리동네GS 앱의 시그니처 옥색(Cyan) 배경에 하얀색 'GS' 글씨를 직접 그립니다. 절대 깨지지 않습니다.
+                method_icon = Image.new('RGBA', (50, 50), (0, 0, 0, 0))
+                mdraw = ImageDraw.Draw(method_icon)
+                mdraw.rounded_rectangle([0, 0, 50, 50], radius=12, fill=(0, 190, 225)) # 공식 앱 옥색(Cyan)
                 try:
-                    # Base64 데이터를 해독하여 작은 크기의 투명 배경 PNG 이미지로 만듭니다.
-                    icon_data = base64.b64decode(gs_logo_base64)
-                    method_icon = Image.open(io.BytesIO(icon_data)).convert("RGBA")
-                    
-                    # 신청 방법 캡슐 색상과 맞춰서 붙여야 하므로, 로고를 그대로 붙이는 것이 가장 좋습니다.
-                    # Base64 데이터는 이미 OFC님이 보여준 공식 로고 색상(파란색/녹색)이 투명 배경에 담겨 있습니다.
-                    # 캡슐 배경색(흰색)과 로고 색상이 잘 어울리므로 그대로 붙입니다.
-                except Exception as e:
-                    # 만약 해독에 실패하면 엑스박스 대신 텍스트로 대체 (X박스 방지)
-                    st.error(f"GS 로고 생성 실패: {e}")
-                    method_icon = None
+                    gs_font = ImageFont.truetype(FONT_FILE, 24)
+                    mdraw.text((25, 25), "GS", font=gs_font, fill=(255, 255, 255), anchor="mm")
+                except:
+                    pass
             else:
                 icon_url = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3ea.png"
                 method_icon = load_icon(icon_url, (50, 50))
@@ -314,12 +307,9 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
             content_start_x = W/2 - total_content_w/2
             
             if method_icon:
-                # 💡 [핵심 해결] 해독된 공식 로고 데이터를 신청 방법 텍스트 옆에 붙입니다.
-                # 외부 링크가 아니므로 무조건 선명하게 나옵니다.
                 img.paste(method_icon, (int(content_start_x), int(center_y - 25)), method_icon)
                 draw.text((content_start_x + icon_space, center_y), m_text, font=m_font, fill=(20, 20, 20), anchor="lm")
             else:
-                # 만약 아이콘을 못 그렸다면 (에러 상황), 텍스트만 중앙 정렬해서 표시 (X박스 방지)
                 draw.text((W/2, center_y), m_text, font=m_font, fill=(20, 20, 20), anchor="mm")
 
         return img.convert("RGB")
@@ -432,7 +422,7 @@ with tab_bulk:
                     except Exception as e:
                         st.error(f"PDF 생성 중 오류 발생: {e}")
 
-# --- [탭 3] 단톡방 사전예약 제작 ---
+# --- [탭 3] 💡 단톡방 사전예약 전용 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 고객님들의 시선을 사로잡을 세로형(모바일 최적화) 홍보물을 만듭니다.")
     
