@@ -20,7 +20,7 @@ st.write("---")
 
 tab_single, tab_bulk, tab_preorder = st.tabs(["📱 단일 상품 제작", "💻 엑셀 대량 제작", "🗓️ 단톡방 사전예약"])
 
-# 💡 [핵심 수정] 봇 차단 방지를 위한 브라우저 위장(User-Agent) 헤더 추가
+# 💡 봇 차단 방지를 위한 브라우저 위장 헤더
 @st.cache_data
 def get_icon_bytes(url):
     try:
@@ -269,16 +269,16 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
                 draw.text((text_start_x, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
             current_y += 70
 
-        # 5. 신청 방법 캡슐
+        # 5. 신청 방법 캡슐 (💡 GS25 로고 주소 오타 완벽 수정!)
         current_y += 40
         if method:
             m_font = ImageFont.truetype(FONT_FILE, 45)
             
-            # 카카오톡, GS25 로고 URL
             if "카톡" in method or "채팅방" in method:
                 icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/KakaoTalk_logo.svg/120px-KakaoTalk_logo.svg.png"
             elif "GS" in method or "어플" in method:
-                icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/GS25_logo_2019.svg/120px-GS25_logo_2019.svg.png"
+                # 괄호가 포함된 정확한 주소로 수정
+                icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/GS25_logo_%282019%29.svg/120px-GS25_logo_%282019%29.svg.png"
             else:
                 icon_url = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3ea.png"
             
@@ -413,7 +413,7 @@ with tab_bulk:
                     except Exception as e:
                         st.error(f"PDF 생성 중 오류 발생: {e}")
 
-# --- [탭 3] 💡 단톡방 사전예약 전용 제작 ---
+# --- [탭 3] 단톡방 사전예약 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 고객님들의 시선을 사로잡을 세로형(모바일 최적화) 홍보물을 만듭니다.")
     
