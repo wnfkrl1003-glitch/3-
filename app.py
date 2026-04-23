@@ -269,20 +269,28 @@ def generate_preorder_poster(product_name, price, pre_period, pickup_date, metho
                 draw.text((text_start_x, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
             current_y += 70
 
-        # 5. 신청 방법 캡슐 (💡 GS25 로고 주소 오타 완벽 수정!)
+        # 5. 신청 방법 캡슐 (💡 GS25 로고 자체 생성으로 100% 무결점 보장)
         current_y += 40
         if method:
             m_font = ImageFont.truetype(FONT_FILE, 45)
+            method_icon = None
             
             if "카톡" in method or "채팅방" in method:
                 icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/KakaoTalk_logo.svg/120px-KakaoTalk_logo.svg.png"
+                method_icon = load_icon(icon_url, (50, 50))
             elif "GS" in method or "어플" in method:
-                # 괄호가 포함된 정확한 주소로 수정
-                icon_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/GS25_logo_%282019%29.svg/120px-GS25_logo_%282019%29.svg.png"
+                # 인터넷 주소를 버리고, 0.1초 만에 깔끔한 '우리동네GS' 형태의 앱 아이콘을 직접 그립니다.
+                method_icon = Image.new('RGBA', (50, 50), (0, 0, 0, 0))
+                mdraw = ImageDraw.Draw(method_icon)
+                mdraw.rounded_rectangle([0, 0, 50, 50], radius=12, fill=(0, 160, 255)) # 우리동네GS 블루 컬러
+                try:
+                    gs_font = ImageFont.truetype(FONT_FILE, 26)
+                    mdraw.text((25, 25), "GS", font=gs_font, fill=(255, 255, 255), anchor="mm")
+                except:
+                    pass
             else:
                 icon_url = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3ea.png"
-            
-            method_icon = load_icon(icon_url, (50, 50))
+                method_icon = load_icon(icon_url, (50, 50))
             
             m_text = method
             m_w = draw.textlength(m_text, font=m_font)
@@ -413,7 +421,7 @@ with tab_bulk:
                     except Exception as e:
                         st.error(f"PDF 생성 중 오류 발생: {e}")
 
-# --- [탭 3] 단톡방 사전예약 제작 ---
+# --- [탭 3] 💡 단톡방 사전예약 전용 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 고객님들의 시선을 사로잡을 세로형(모바일 최적화) 홍보물을 만듭니다.")
     
@@ -427,7 +435,7 @@ with tab_preorder:
     method_pre = st.selectbox("신청 방법", ["매장 방문 예약", "우리동네GS 어플 접속", "단체 채팅방 카톡 요청"], key="pre_met")
     
     st.write("---")
-    st.markdown("🖼️ **사진 넣기**: 구글 이미지 링크나 다운로드한 사진을 넣어주세요! (Base64 코드도 알아서 해독합니다!)")
+    st.markdown("🖼️ **사진 넣기**: 구글 이미지 링크나 다운로드한 사진을 넣어주세요!")
     img_link_pre = st.text_input("🔗 이미지 주소", key="pre_link")
     img_file_pre = st.file_uploader("📂 사진 업로드", type=["jpg", "png"], key="pre_file")
     
