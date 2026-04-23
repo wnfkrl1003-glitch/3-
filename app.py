@@ -174,7 +174,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
     except Exception as e:
         return None
 
-# --- [함수 2] 💡 단톡방 사전예약 전용 엔진 (점포 헤더 기능 추가) ---
+# --- [함수 2] 단톡방 사전예약 전용 엔진 ---
 def generate_preorder_poster(store_header, product_name, price, pre_period, pickup_date, method, img_source):
     try:
         W, H = 1080, 1350 
@@ -194,20 +194,26 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
                 if line: lines.append(line)
             return "\n".join(lines)
 
-        # 💡 [신규 추가] 0. 점포 브랜딩 헤더 (맨 위)
-        header_font = ImageFont.truetype(FONT_FILE, 38)
-        draw.text((W/2, 60), store_header, font=header_font, fill=(120, 120, 120), anchor="ma")
-        draw.line([(150, 90), (W-150, 90)], fill=(210, 205, 195), width=2) # 얇은 구분선
+        # 💡 [완벽 수정] 0. 점포 브랜딩 헤더 (가독성 & 레이아웃 최적화)
+        header_font = ImageFont.truetype(FONT_FILE, 45)
+        # 글자 크기를 키우고 묵직한 다크 브라운 색상으로 가독성 개선
+        draw.text((W/2, 60), store_header, font=header_font, fill=(80, 60, 50), anchor="ma")
+        
+        # 글자와 선이 겹치지 않도록 Y좌표를 125로 넉넉하게 내림
+        line_y = 125
+        draw.line([(120, line_y), (W-120, line_y)], fill=(200, 190, 180), width=3) 
 
-        # 1. 상품명 (중앙 상단)
+        # 1. 상품명 (구분선 아래로 자연스럽게 배치)
         title_font = ImageFont.truetype(FONT_FILE, 85)
         w_title = wrap_text_centered(product_name, title_font, 950)
         bbox = draw.multiline_textbbox((0,0), w_title, font=title_font, align="center")
         title_h = bbox[3] - bbox[1]
-        draw.multiline_text((W/2, 160), w_title, font=title_font, fill=(50, 30, 20), anchor="ma", align="center")
+        
+        title_start_y = line_y + 45 # 가로선에서 45px 띄워서 시작
+        draw.multiline_text((W/2, title_start_y), w_title, font=title_font, fill=(50, 30, 20), anchor="ma", align="center")
 
         # 2. 가격 캡슐
-        current_y = 160 + title_h + 50
+        current_y = title_start_y + title_h + 50
         if price:
             clean_p = str(price).strip()
             if clean_p and not clean_p.endswith("원"): clean_p += "원"
@@ -251,7 +257,7 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
 
         current_y += img_area_h + 80
 
-        # 4. 예약 기간 & 수령 일자 (압정 핀 아이콘 적용)
+        # 4. 예약 기간 & 수령 일자
         date_font = ImageFont.truetype(FONT_FILE, 45)
         text_start_x = 120
         
@@ -274,7 +280,7 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
                 draw.text((text_start_x, current_y), f"수령 일자: {pickup_date}", font=date_font, fill=(40, 40, 40), anchor="lm")
             current_y += 70
 
-        # 5. 신청 방법 캡슐 (무결점 직접 그리기 적용)
+        # 5. 신청 방법 캡슐
         current_y += 40
         if method:
             m_font = ImageFont.truetype(FONT_FILE, 45)
@@ -413,14 +419,13 @@ with tab_bulk:
                             st.download_button("📥 완성된 PDF 다운로드", pdf_buf.getvalue(), "GS25_Promos.pdf", "application/pdf", use_container_width=True)
                     except Exception as e: st.error(f"PDF 생성 오류: {e}")
 
-# --- [탭 3] 💡 단톡방 사전예약 제작 (점포 헤더 기능 추가) ---
+# --- [탭 3] 💡 단톡방 사전예약 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 사전예약 홍보물을 만듭니다. 점포명을 넣으면 홍보물 상단에 자동 반영됩니다.")
     
-    # 💡 [신규 추가] 점포명 입력 옵션
-    store_input = st.text_input("🏪 점포명", placeholder="0000점 (미입력 시 기본 문구 추출)", key="pre_store")
+    # 💡 [맞춤 반영] 예시 문구를 이천중리타운점으로 교체
+    store_input = st.text_input("🏪 점포명", placeholder="예: 이천중리타운점 (미입력 시 기본 문구 추출)", key="pre_store")
     
-    # 점포 헤더 로직
     if store_input:
         final_header = f"GS25 {store_input} 사전 예약"
     else:
@@ -442,7 +447,6 @@ with tab_preorder:
     
     if st.button("🚀 단톡방용 사전예약 홍보물 만들기", use_container_width=True):
         final_src_pre = img_file_pre if img_file_pre else (img_link_pre if img_link_pre else None)
-        # 💡 [업데이트] final_header 파라미터 전달
         res_pre = generate_preorder_poster(final_header, pn_pre, price_pre, period_pre, pickup_pre, method_pre, final_src_pre)
         if res_pre:
             st.image(res_pre, use_container_width=True, caption=f"{final_header} 디자인")
