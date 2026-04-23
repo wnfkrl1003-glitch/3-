@@ -174,7 +174,7 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
     except Exception as e:
         return None
 
-# --- [함수 2] 💡 단톡방 사전예약 엔진 ---
+# --- [함수 2] 💡 단톡방 사전예약 엔진 (잘림 방지 및 줄바꿈 최적화) ---
 def generate_preorder_poster(store_header, product_name, price, pre_period, pickup_date, description, method, img_source):
     try:
         W = 1080
@@ -182,11 +182,10 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
         img = Image.new('RGB', (W, H_initial), color=(248, 244, 232)) 
         draw = ImageDraw.Draw(img)
 
-        # 💡 [핵심 해결] 어절(단어) 단위 스마트 줄바꿈
         def wrap_text_centered(text, font, max_w):
             lines = []
             for para in text.split('\n'):
-                words = para.split(' ') # 띄어쓰기 기준으로 먼저 나눕니다
+                words = para.split(' ') 
                 current_line = ""
                 for word in words:
                     test_line = current_line + (" " if current_line else "") + word
@@ -197,7 +196,6 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
                             lines.append(current_line)
                             current_line = word
                         else:
-                            # 단어 하나가 max_w보다 긴 극단적인 경우 글자 단위로 쪼갬
                             char_line = ""
                             for char in word:
                                 if draw.textlength(char_line + char, font=font) <= max_w:
@@ -438,8 +436,14 @@ with tab_bulk:
 # --- [탭 3] 단톡방 사전예약 제작 ---
 with tab_preorder:
     st.info("💡 단톡방 사전예약 홍보물을 만듭니다. '상품 설명'에 소스 동봉, 완판 소식 등을 자유롭게 적어보세요.")
-    store_input = st.text_input("🏪 점포명", placeholder="예: 이천중리타운점", key="pre_store")
-    final_header = f"GS25 {store_input} 사전 예약" if store_input else "GS25 사전 예약"
+    
+    # 💡 [맞춤 반영] 예시 문구 0000점 복구 완료!
+    store_input = st.text_input("🏪 점포명", placeholder="예: 0000점 (미입력 시 기본 문구 추출)", key="pre_store")
+    
+    if store_input:
+        final_header = f"GS25 {store_input} 사전 예약"
+    else:
+        final_header = "GS25 사전 예약"
     
     pn_pre = st.text_area("상품명", placeholder="예: 한우 냉장 육회 200G", height=80, key="pre_pn")
     price_pre = st.text_input("가격 및 할인 조건", placeholder="예: BC카드 구매 시 18,900원", key="pre_pr")
@@ -450,7 +454,8 @@ with tab_preorder:
     
     desc_pre = st.text_area("📄 상품 설명 (선택사항)", placeholder="예: 전용 소스 동봉 / 1차 완판 화제 상품! / 수량 한정", height=80, key="pre_desc")
     
-    method_pre = st.selectbox("신청 방법", ["매장 방문 예약", "우리동네GS 어플 접속", "단체 채팅방 카톡 요청"], key="pre_met")
+    # 💡 [맞춤 반영] 신청 방법 문구 직관적으로 변경 완료!
+    method_pre = st.selectbox("신청 방법", ["매장 방문 예약", "우리동네GS 어플 접속 후 사전 예약", "단체 채팅방 카톡 요청"], key="pre_met")
     
     st.write("---")
     img_link_pre = st.text_input("🔗 이미지 주소", key="pre_link")
