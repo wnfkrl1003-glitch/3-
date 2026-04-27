@@ -22,7 +22,6 @@ st.write("---")
 
 tab_single, tab_bulk, tab_preorder = st.tabs(["📱 단일 상품 제작", "💻 엑셀 대량 제작", "🗓️ 단톡방 사전예약"])
 
-# --- [도우미 함수] 요일 및 날짜 포맷팅 ---
 def format_date_range(start_date, end_date):
     weekdays = ["월", "화", "수", "목", "금", "토", "일"]
     s_f = f"{start_date.month}/{start_date.day}({weekdays[start_date.weekday()]})"
@@ -33,7 +32,6 @@ def format_single_date(target_date):
     weekdays = ["월", "화", "수", "목", "금", "토", "일"]
     return f"{target_date.month}/{target_date.day}({weekdays[target_date.weekday()]})"
 
-# 💡 봇 차단 방지를 위한 브라우저 위장 헤더
 @st.cache_data
 def get_icon_bytes(url):
     try:
@@ -52,54 +50,67 @@ def load_icon(url, size):
         except: return None
     return None
 
-# 💡 [핵심 해결] 괄호 유령 방지 및 의미 단위 스마트 줄바꿈 로직
-def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj, is_title=False):
+# 💡 [핵심 엔진] 괄호 유령 방지 및 의미 단위 스마트 줄바꿈
+def wrap_text_safe(text, font, max_w, draw_obj):
+    lines = []
+    # 혼자 떨어지면 안 되는 금칙어 리스트
+    prohibited_start = [')', ']', '}', '원', '개', '캔', 'g', 'G', 'ml', 'ML', '입', 'L', 'l', '%', ',', '.']
+    for para in text.split('\n'):
+        words = para.split(' ')
+        current_line = ""
+        for word in words:
+            test_line = current_line + (" " if current_line else "") + word
+            if draw_obj.textlength(test_line, font=font) <= max_w:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                    current_line = word
+                else:
+                    char_line = ""
+                    j = 0
+                    while j < len(word):
+                        char = word[j]
+                        if draw_obj.textlength(char_line + char, font=font) <= max_w:
+                            char_line += char
+                            j += 1
+                        else:
+                            # [금칙어 보호 1] 잘리는 글자가 괄호나 단위면 앞 글자를 데리고 다음 줄로 갑니다.
+                            if char in prohibited_start and len(char_line) > 0:
+                                pushed_char = char_line[-1]
+                                lines.append(char_line[:-1])
+                                char_line = pushed_char + char
+                                j += 1
+                            # [금칙어 보호 2] 앞 글자가 여는 괄호면 괄호를 통째로 다음 줄로 데리고 갑니다.
+                            elif len(char_line) > 0 and char_line[-1] in ['(', '[']:
+                                lines.append(char_line[:-1])
+                                char_line = char_line[-1] + char
+                                j += 1
+                            else:
+                                lines.append(char_line)
+                                char_line = char
+                                j += 1
+                    current_line = char_line
+        if current_line:
+            lines.append(current_line)
+    return "\n".join(lines)
+
+def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj):
     font_size = max_size
     min_size = 15
-    # 금칙어 처리: 아래 문자들이 줄의 맨 처음에 오지 않도록 합니다.
-    prohibited_start = [')', ']', '}', '>', '원', '개', '캔', ',', '.', 'g', 'G', 'ml', 'ML']
-    
     while font_size >= min_size:
         font = ImageFont.truetype(font_file, font_size)
-        lines = []
-        for paragraph in text.split('\n'):
-            current_line = ""
-            i = 0
-            while i < len(paragraph):
-                char = paragraph[i]
-                test_line = current_line + char
-                
-                # 현재 줄에 글자를 더했을 때 너비를 넘는지 확인
-                if draw_obj.textlength(test_line, font=font) <= max_w:
-                    current_line = test_line
-                    i += 1
-                else:
-                    # 너비를 넘었을 때: 만약 다음 글자가 '금칙어'라면 현재 줄에 억지로 붙입니다.
-                    if i < len(paragraph) and paragraph[i] in prohibited_start:
-                        current_line += paragraph[i]
-                        lines.append(current_line.strip())
-                        current_line = ""
-                        i += 1
-                    else:
-                        if current_line == "": # 한 글자도 못 넣을 정도로 좁은 경우
-                            lines.append(char)
-                            i += 1
-                        else:
-                            lines.append(current_line.strip())
-                            current_line = ""
-            if current_line:
-                lines.append(current_line.strip())
-                
-        wrapped_text = "\n".join(lines)
+        wrapped_text = wrap_text_safe(text, font, max_w, draw_obj)
         bbox = draw_obj.multiline_textbbox((0, 0), wrapped_text, font=font, spacing=int(font_size*0.2))
         
-        # 실제 그려진 텍스트의 최대 너비 재계산
+        lines = wrapped_text.split('\n')
         actual_max_w = max([draw_obj.textlength(line, font=font) for line in lines]) if lines else 0
         
         if (bbox[3] - bbox[1]) <= max_h and actual_max_w <= max_w:
             return wrapped_text, font
-        font_size -= 2 # 폰트를 줄여가며 재시도
-    return wrapped_text, ImageFont.truetype(font_file, min_size)
+        font_size -= 2
+    font = ImageFont.truetype(font_file, min_size)
+    return wrap_text_safe(text, font, max_w, draw_obj), font
 
 # --- [함수 1] 일반 홍보물 생성 엔진 (가로형) ---
 def generate_poster(event_type, duration, product_name, original_price, price, img_source):
@@ -108,22 +119,26 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
         img = Image.open("template.jpg").convert("RGBA")
         img = img.resize((A4_W, A4_H)) 
         draw = ImageDraw.Draw(img)
-        USER_MARGIN_PX, USER_IMG_SCALE, USER_TEXT_SCALE = 72, 1.1, 1.6
+        
+        USER_MARGIN_PX = 72      
+        USER_IMG_SCALE = 1.1     
+        USER_TEXT_SCALE = 1.6    
         margin_right = A4_W - USER_MARGIN_PX 
 
-        # 1. 행사 기간 (의미 단위 줄바꿈 적용)
+        # 💡 [날짜 개선] 기간이 길면 ~ 를 기준으로 깔끔하게 두 줄로 강제 배치
         if duration:
-            max_date_w, max_date_h = A4_W * 0.30, A4_H * 0.20
-            # 날짜는 폰트를 조금 더 작게 시작해서 한 줄에 나오도록 유도
+            if "~" in duration and "\n" not in duration:
+                duration = duration.replace("~", "~\n")
+            max_date_w, max_date_h = A4_W * 0.22, A4_H * 0.20
             w_date, f_date = fit_text_to_box(duration, FONT_FILE, int(A4_W * 0.035), max_date_w, max_date_h, draw)
-            draw.text((margin_right, A4_H * 0.15), w_date, font=f_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(f_date.size*0.2))
+            draw.multiline_text((margin_right, A4_H * 0.15), w_date, font=f_date, fill=(0, 0, 0), anchor="rm", align="right", spacing=int(f_date.size*0.2))
         
-        # 2. 로고
+        # 💡 [로고 개선] 로고 크기를 살짝 줄이고 좌측으로 당겨 날짜와의 겹침 원천 차단
         if event_type != "선택안함":
             promo_filename = f"{event_type}.png"
             if os.path.exists(promo_filename):
                 p_img = Image.open(promo_filename).convert("RGBA")
-                max_p_w, max_p_h = int(A4_W * 0.55), int(A4_H * 0.26)
+                max_p_w, max_p_h = int(A4_W * 0.45), int(A4_H * 0.22)
                 p_ratio = p_img.width / p_img.height
                 t_p_h = max_p_h
                 t_p_w = int(t_p_h * p_ratio)
@@ -131,15 +146,15 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                     t_p_w = max_p_w
                     t_p_h = int(t_p_w / p_ratio)
                 p_img = p_img.resize((t_p_w, t_p_h), Image.LANCZOS)
-                img.paste(p_img, (int((A4_W * 0.5) - (t_p_w / 2)), int((A4_H * 0.28) - t_p_h)), p_img)
+                # 중심을 40% 지점으로 이동
+                img.paste(p_img, (int((A4_W * 0.40) - (t_p_w / 2)), int((A4_H * 0.28) - t_p_h)), p_img)
 
-        # 3. 상품명 (그림 영역 절대 침범 금지: 너비 45% 제한)
+        # 상품명 (의미 단위 줄바꿈 적용 & multiline_text 사용)
         if product_name:
             max_t_w, max_t_h = A4_W * 0.45, A4_H * 0.18 
-            w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_t_w, max_t_h, draw, is_title=True)
-            draw.text((margin_right, A4_H * 0.61), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
+            w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_t_w, max_t_h, draw)
+            draw.multiline_text((margin_right, A4_H * 0.61), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
         
-        # 4. 정상가
         if original_price:
             clean_op = str(original_price).strip()
             if clean_op:
@@ -152,21 +167,28 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                     font_orig = ImageFont.truetype(FONT_FILE, orig_size)
                 draw.text((margin_right, A4_H * 0.69), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
-        # 5. 매가 (수량/가격 분리 디자인)
         if price:
             clean_p = str(price).strip()
             if clean_p:
                 if not clean_p.endswith("원"): clean_p += "원"
-                p_size, c_size = int(A4_W * 0.14 * USER_TEXT_SCALE), int(A4_W * 0.06 * USER_TEXT_SCALE)
+                p_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
+                c_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
                 
                 if any(unit in clean_p for unit in ["캔", "개"]):
                     unit = "캔" if "캔" in clean_p else "개"
                     parts = clean_p.split(unit, 1)
-                    count_t, price_t = parts[0] + unit, parts[1].strip()
-                    f_p, f_c = ImageFont.truetype(FONT_FILE, p_size), ImageFont.truetype(FONT_FILE, c_size)
+                    count_t = parts[0] + unit
+                    price_t = parts[1].strip()
+                    
+                    f_p = ImageFont.truetype(FONT_FILE, p_size)
+                    f_c = ImageFont.truetype(FONT_FILE, c_size)
+                    
                     while (draw.textlength(price_t, font=f_p) + draw.textlength(count_t, font=f_c)) > (A4_W * 0.45) and p_size > 30:
-                        p_size, c_size = p_size - 4, c_size - 2
-                        f_p, f_c = ImageFont.truetype(FONT_FILE, p_size), ImageFont.truetype(FONT_FILE, c_size)
+                        p_size -= 4
+                        c_size -= 2
+                        f_p = ImageFont.truetype(FONT_FILE, p_size)
+                        f_c = ImageFont.truetype(FONT_FILE, c_size)
+                        
                     draw.text((margin_right, A4_H * 0.82), price_t, font=f_p, fill=(220, 20, 20), anchor="rm")
                     price_w = draw.textlength(price_t, font=f_p)
                     draw.text((margin_right - price_w - (A4_W * 0.02), A4_H * 0.82), count_t, font=f_c, fill=(220, 20, 20), anchor="rm")
@@ -177,7 +199,6 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                         f_p = ImageFont.truetype(FONT_FILE, p_size)
                     draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
 
-        # 6. 이미지
         if img_source:
             if isinstance(img_source, str):
                 if img_source.startswith("http"):
@@ -200,59 +221,36 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
         return img.convert("RGB")
     except Exception as e: return None
 
-# --- [함수 2] 단톡방 사전예약 엔진 (고무줄 캔버스) ---
+# --- [함수 2] 단톡방 사전예약 엔진 ---
 def generate_preorder_poster(store_header, product_name, price, pre_period, pickup_date, description, method, img_source):
     try:
         W, H_initial = 1080, 2500 
         img = Image.new('RGB', (W, H_initial), color=(248, 244, 232)) 
         draw = ImageDraw.Draw(img)
 
-        # 💡 사전예약 전용 줄바꿈 로직
-        def wrap_text_centered_safe(text, font, max_w):
-            lines = []
-            for paragraph in text.split('\n'):
-                current_line = ""
-                i = 0
-                while i < len(paragraph):
-                    char = paragraph[i]
-                    if draw.textlength(current_line + char, font=font) <= max_w:
-                        current_line += char
-                        i += 1
-                    else:
-                        # 다음 글자가 닫는 괄호라면 현재 줄에 포함
-                        if i < len(paragraph) and paragraph[i] in [')', ']', '원', 'g']:
-                            current_line += paragraph[i]
-                            i += 1
-                        lines.append(current_line.strip())
-                        current_line = ""
-                if current_line: lines.append(current_line.strip())
-            return "\n".join(lines)
-
-        # 헤더 & 구분선
         header_font = ImageFont.truetype(FONT_FILE, 45)
         draw.text((W/2, 60), store_header, font=header_font, fill=(80, 60, 50), anchor="ma")
         line_y = 125
         draw.line([(120, line_y), (W-120, line_y)], fill=(200, 190, 180), width=3) 
 
-        # 상품명
         title_font = ImageFont.truetype(FONT_FILE, 85)
-        w_title = wrap_text_centered_safe(product_name, title_font, 950)
+        w_title = wrap_text_safe(product_name, title_font, 950, draw)
         bbox = draw.multiline_textbbox((0,0), w_title, font=title_font, align="center")
         title_h = bbox[3] - bbox[1]
         t_y = line_y + 45 
         draw.multiline_text((W/2, t_y), w_title, font=title_font, fill=(50, 30, 20), anchor="ma", align="center")
 
-        # 가격 캡슐
         cur_y = t_y + title_h + 50
         if price:
             clean_p = str(price).strip()
             if not clean_p.endswith("원"): clean_p += "원"
-            p_size, max_p_w = 80, W - 180 
+            p_size = 80
             p_f = ImageFont.truetype(FONT_FILE, p_size)
+            max_p_w = W - 180 
             while draw.textlength(clean_p, font=p_f) > max_p_w and p_size > 40:
                 p_size -= 2
                 p_f = ImageFont.truetype(FONT_FILE, p_size)
-            w_p = wrap_text_centered_safe(clean_p, p_f, max_p_w)
+            w_p = wrap_text_safe(clean_p, p_f, max_p_w, draw)
             bbox_p = draw.multiline_textbbox((0,0), w_p, font=p_f, align="center")
             p_w, p_h = bbox_p[2] - bbox_p[0], bbox_p[3] - bbox_p[1]
             pad_x, pad_y = 60, 25
@@ -262,7 +260,6 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
             cur_y = pill[3] + 60
         else: cur_y += 60
 
-        # 이미지
         img_area_h = 450
         if img_source:
             if isinstance(img_source, str):
@@ -288,7 +285,6 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
         pin_url = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f4cc.png"
         pin_icon = load_icon(pin_url, (45, 45))
 
-        # 예약/수령 날짜
         if pre_period:
             if pin_icon: img.paste(pin_icon, (120, int(cur_y - 22)), pin_icon)
             draw.text((180, cur_y), f"사전예약 기간: {pre_period}", font=d_f, fill=(40, 40, 40), anchor="lm")
@@ -298,16 +294,14 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
             draw.text((180, cur_y), f"수령 일자: {pickup_date}", font=d_f, fill=(40, 40, 40), anchor="lm")
             cur_y += 70
 
-        # 설명란
         if description:
             cur_y += 30
             desc_font = ImageFont.truetype(FONT_FILE, 40)
-            w_desc = wrap_text_centered_safe(description, desc_font, 900)
+            w_desc = wrap_text_safe(description, desc_font, 900, draw)
             bbox_d = draw.multiline_textbbox((0,0), w_desc, font=desc_font, align="center", spacing=15)
             draw.multiline_text((W/2, cur_y), w_desc, font=desc_font, fill=(100, 80, 70), anchor="ma", align="center", spacing=15)
             cur_y += (bbox_d[3] - bbox_d[1]) + 50
 
-        # 신청 방법
         if method:
             cur_y += 30
             m_f = ImageFont.truetype(FONT_FILE, 45)
@@ -327,15 +321,14 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
             m_w = draw.textlength(method, font=m_f)
             i_space = 65 if method_icon else 0
             total_w, m_h, pad_x, pad_y = m_w + i_space, 50, 60, 25
-            m_box = [W/2 - total_w/2 - pad_x, cur_y, W/2 + total_w/2 + pad_x, current_y + m_h + pad_y*2]
+            m_box = [W/2 - total_w/2 - pad_x, cur_y, W/2 + total_w/2 + pad_x, cur_y + m_h + pad_y*2]
             draw.rounded_rectangle(m_box, radius=35, fill=(255, 255, 255))
-            c_y, c_x = current_y + pad_y + m_h/2, W/2 - total_w/2
+            c_y, c_x = cur_y + pad_y + m_h/2, W/2 - total_w/2
             if method_icon:
                 img.paste(method_icon, (int(c_x), int(c_y - 25)), method_icon)
                 draw.text((c_x + i_space, c_y), method, font=m_f, fill=(20, 20, 20), anchor="lm")
             else: draw.text((W/2, c_y), method, font=m_f, fill=(20, 20, 20), anchor="mm")
             cur_y = m_box[3] 
-        
         final_h = max(1350, int(cur_y + 100)) 
         img = img.crop((0, 0, W, final_h))
         return img.convert("RGB")
