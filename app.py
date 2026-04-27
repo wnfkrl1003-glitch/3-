@@ -22,7 +22,6 @@ st.write("---")
 
 tab_single, tab_bulk, tab_preorder = st.tabs(["📱 단일 상품 제작", "💻 엑셀 대량 제작", "🗓️ 단톡방 사전예약"])
 
-# --- [도우미 함수] 요일 및 날짜 포맷팅 ---
 def format_date_range(start_date, end_date):
     weekdays = ["월", "화", "수", "목", "금", "토", "일"]
     s_f = f"{start_date.month}/{start_date.day}({weekdays[start_date.weekday()]})"
@@ -33,7 +32,6 @@ def format_single_date(target_date):
     weekdays = ["월", "화", "수", "목", "금", "토", "일"]
     return f"{target_date.month}/{target_date.day}({weekdays[target_date.weekday()]})"
 
-# 💡 봇 차단 방지를 위한 브라우저 위장 헤더
 @st.cache_data
 def get_icon_bytes(url):
     try:
@@ -52,7 +50,7 @@ def load_icon(url, size):
         except: return None
     return None
 
-# --- [공통 함수] 텍스트 스마트 줄바꿈 ---
+# 💡 [핵심 해결] 띄어쓰기 없는 한국어 단어를 위한 100% 철벽 줄바꿈 로직
 def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj, is_title=False):
     font_size = max_size
     min_size = 15
@@ -60,20 +58,39 @@ def fit_text_to_box(text, font_file, max_size, max_w, max_h, draw_obj, is_title=
         font = ImageFont.truetype(font_file, font_size)
         lines = []
         for paragraph in text.split('\n'):
-            words = paragraph.split(' ')
             current_line = ""
-            for word in words:
-                test_line = current_line + (" " if current_line else "") + word
+            last_break_idx = -1
+            i = 0
+            while i < len(paragraph):
+                char = paragraph[i]
+                test_line = current_line + char
                 if draw_obj.textlength(test_line, font=font) <= max_w:
                     current_line = test_line
+                    if is_title and char in [' ', ')', ']']:
+                        last_break_idx = len(current_line) - 1
+                    i += 1
                 else:
-                    if current_line: lines.append(current_line)
-                    current_line = word
-            if current_line: lines.append(current_line)
+                    if current_line == "":
+                        lines.append(char)
+                        i += 1
+                    elif is_title and last_break_idx != -1 and last_break_idx > 0:
+                        lines.append(current_line[:last_break_idx+1].strip())
+                        current_line = current_line[last_break_idx+1:]
+                        last_break_idx = -1
+                    else:
+                        lines.append(current_line.strip())
+                        current_line = ""
+                        last_break_idx = -1
+            if current_line:
+                lines.append(current_line.strip())
+                
         wrapped_text = "\n".join(lines)
         bbox = draw_obj.multiline_textbbox((0, 0), wrapped_text, font=font, spacing=int(font_size*0.2))
-        if (bbox[3] - bbox[1]) <= max_h: return wrapped_text, font
-        font_size -= 2
+        
+        max_line_w = max([draw_obj.textlength(line, font=font) for line in lines]) if lines else 0
+        if (bbox[3] - bbox[1]) <= max_h and max_line_w <= max_w:
+            return wrapped_text, font
+        font_size -= 4
     return wrapped_text, ImageFont.truetype(font_file, min_size)
 
 # --- [함수 1] 일반 홍보물 생성 엔진 (가로형) ---
@@ -83,7 +100,10 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
         img = Image.open("template.jpg").convert("RGBA")
         img = img.resize((A4_W, A4_H)) 
         draw = ImageDraw.Draw(img)
-        USER_MARGIN_PX, USER_IMG_SCALE, USER_TEXT_SCALE = 72, 1.1, 1.6
+        
+        USER_MARGIN_PX = 72      
+        USER_IMG_SCALE = 1.1     
+        USER_TEXT_SCALE = 1.6    
         margin_right = A4_W - USER_MARGIN_PX 
 
         if duration:
@@ -105,8 +125,9 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 p_img = p_img.resize((t_p_w, t_p_h), Image.LANCZOS)
                 img.paste(p_img, (int((A4_W * 0.5) - (t_p_w / 2)), int((A4_H * 0.28) - t_p_h)), p_img)
 
+        # 💡 [핵심 해결] 상품명 너비 제한을 45%로 강화하여 이미지 영역 침범 절대 불가
         if product_name:
-            max_t_w, max_t_h = A4_W * 0.50, A4_H * 0.18 
+            max_t_w, max_t_h = A4_W * 0.45, A4_H * 0.18 
             w_title, f_title = fit_text_to_box(product_name, FONT_FILE, int(A4_W * 0.055 * USER_TEXT_SCALE), max_t_w, max_t_h, draw, is_title=True)
             draw.text((margin_right, A4_H * 0.61), w_title, font=f_title, fill=(0, 0, 0), anchor="rd", align="right", spacing=int(f_title.size*0.2))
         
@@ -117,21 +138,43 @@ def generate_poster(event_type, duration, product_name, original_price, price, i
                 orig_text = f"정상가 {clean_op}"
                 orig_size = int(A4_W * 0.02 * USER_TEXT_SCALE)
                 font_orig = ImageFont.truetype(FONT_FILE, orig_size)
-                while draw.textlength(orig_text, font=font_orig) > (A4_W * 0.4) and orig_size > 20:
+                while draw.textlength(orig_text, font=font_orig) > (A4_W * 0.45) and orig_size > 20:
                     orig_size -= 2
                     font_orig = ImageFont.truetype(FONT_FILE, orig_size)
                 draw.text((margin_right, A4_H * 0.69), orig_text, font=font_orig, fill=(160, 160, 160), anchor="rm")
 
+        # 💡 [핵심 복구] '3개', '4,000원' 분리 크기 지정 로직 복구 완료!
         if price:
             clean_p = str(price).strip()
             if clean_p:
                 if not clean_p.endswith("원"): clean_p += "원"
                 p_size = int(A4_W * 0.14 * USER_TEXT_SCALE)
-                f_p = ImageFont.truetype(FONT_FILE, p_size)
-                while draw.textlength(clean_p, font=f_p) > (A4_W * 0.45) and p_size > 15:
-                    p_size -= 4
+                c_size = int(A4_W * 0.06 * USER_TEXT_SCALE)
+                
+                if any(unit in clean_p for unit in ["캔", "개"]):
+                    unit = "캔" if "캔" in clean_p else "개"
+                    parts = clean_p.split(unit, 1)
+                    count_t = parts[0] + unit
+                    price_t = parts[1].strip()
+                    
                     f_p = ImageFont.truetype(FONT_FILE, p_size)
-                draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
+                    f_c = ImageFont.truetype(FONT_FILE, c_size)
+                    
+                    while (draw.textlength(price_t, font=f_p) + draw.textlength(count_t, font=f_c)) > (A4_W * 0.45) and p_size > 30:
+                        p_size -= 4
+                        c_size -= 2
+                        f_p = ImageFont.truetype(FONT_FILE, p_size)
+                        f_c = ImageFont.truetype(FONT_FILE, c_size)
+                        
+                    draw.text((margin_right, A4_H * 0.82), price_t, font=f_p, fill=(220, 20, 20), anchor="rm")
+                    price_w = draw.textlength(price_t, font=f_p)
+                    draw.text((margin_right - price_w - (A4_W * 0.02), A4_H * 0.82), count_t, font=f_c, fill=(220, 20, 20), anchor="rm")
+                else:
+                    f_p = ImageFont.truetype(FONT_FILE, p_size)
+                    while draw.textlength(clean_p, font=f_p) > (A4_W * 0.45) and p_size > 15:
+                        p_size -= 4
+                        f_p = ImageFont.truetype(FONT_FILE, p_size)
+                    draw.text((margin_right, A4_H * 0.82), clean_p, font=f_p, fill=(220, 20, 20), anchor="rm")
 
         if img_source:
             if isinstance(img_source, str):
@@ -162,18 +205,27 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
         img = Image.new('RGB', (W, H_initial), color=(248, 244, 232)) 
         draw = ImageDraw.Draw(img)
 
-        def wrap_text_centered_word(text, font, max_w):
+        # 💡 사전예약에도 동일한 100% 무결점 스마트 줄바꿈 적용
+        def wrap_text_centered_safe(text, font, max_w):
             lines = []
-            for para in text.split('\n'):
-                words = para.split(' ')
-                cur = ""
-                for w in words:
-                    test = cur + (" " if cur else "") + w
-                    if draw.textlength(test, font=font) <= max_w: cur = test
+            for paragraph in text.split('\n'):
+                current_line = ""
+                i = 0
+                while i < len(paragraph):
+                    char = paragraph[i]
+                    test_line = current_line + char
+                    if draw.textlength(test_line, font=font) <= max_w:
+                        current_line = test_line
+                        i += 1
                     else:
-                        if cur: lines.append(cur)
-                        cur = w
-                if cur: lines.append(cur)
+                        if current_line == "":
+                            lines.append(char)
+                            i += 1
+                        else:
+                            lines.append(current_line.strip())
+                            current_line = ""
+                if current_line:
+                    lines.append(current_line.strip())
             return "\n".join(lines)
 
         header_font = ImageFont.truetype(FONT_FILE, 45)
@@ -182,7 +234,7 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
         draw.line([(120, line_y), (W-120, line_y)], fill=(200, 190, 180), width=3) 
 
         title_font = ImageFont.truetype(FONT_FILE, 85)
-        w_title = wrap_text_centered_word(product_name, title_font, 950)
+        w_title = wrap_text_centered_safe(product_name, title_font, 950)
         bbox = draw.multiline_textbbox((0,0), w_title, font=title_font, align="center")
         title_h = bbox[3] - bbox[1]
         t_y = line_y + 45 
@@ -198,7 +250,7 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
             while draw.textlength(clean_p, font=p_f) > max_p_w and p_size > 40:
                 p_size -= 2
                 p_f = ImageFont.truetype(FONT_FILE, p_size)
-            w_p = wrap_text_centered_word(clean_p, p_f, max_p_w)
+            w_p = wrap_text_centered_safe(clean_p, p_f, max_p_w)
             bbox_p = draw.multiline_textbbox((0,0), w_p, font=p_f, align="center")
             p_w, p_h = bbox_p[2] - bbox_p[0], bbox_p[3] - bbox_p[1]
             pad_x, pad_y = 60, 25
@@ -245,7 +297,7 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
         if description:
             cur_y += 30
             desc_font = ImageFont.truetype(FONT_FILE, 40)
-            w_desc = wrap_text_centered_word(description, desc_font, 900)
+            w_desc = wrap_text_centered_safe(description, desc_font, 900)
             bbox_d = draw.multiline_textbbox((0,0), w_desc, font=desc_font, align="center", spacing=15)
             draw.multiline_text((W/2, cur_y), w_desc, font=desc_font, fill=(100, 80, 70), anchor="ma", align="center", spacing=15)
             cur_y += (bbox_d[3] - bbox_d[1]) + 50
@@ -285,8 +337,6 @@ def generate_preorder_poster(store_header, product_name, price, pre_period, pick
 # --- [탭 1] 단일 상품 제작 ---
 with tab_single:
     ev = st.selectbox("행사 종류", ["선택안함", "1+1", "2+1", "혜택가"], key="s_ev")
-    
-    # 💡 [날짜 입력 로직 적용]
     d_mode = st.radio("날짜 입력 방식", ["달력 선택", "직접 입력"], horizontal=True, key="s_dmode")
     if d_mode == "달력 선택":
         dates = st.date_input("행사 기간 선택", value=[date.today(), date.today()], key="s_dates")
@@ -312,9 +362,8 @@ with tab_single:
 # --- [탭 2] 엑셀 대량 제작 ---
 with tab_bulk:
     st.subheader("📁 엑셀 데이터 불러오기")
-    bulk_input = st.text_area("데이터 붙여넣기", placeholder="1\t꿀호떡\t2000\t1000\n3\t삼겹살\t\t7500", height=150)
+    bulk_input = st.text_area("데이터 붙여넣기", placeholder="1\t신선가득꿀호떡\t2000\t3개 4000원\n3\t삼겹살\t\t7500", height=150)
     
-    # 💡 [공통 날짜 입력 로직 적용]
     gb_dmode = st.radio("공통 날짜 입력 방식", ["달력 선택", "직접 입력"], horizontal=True, key="gb_dmode")
     if gb_dmode == "달력 선택":
         gb_dates = st.date_input("공통 행사 기간 선택", value=[date.today(), date.today()], key="gb_dates")
@@ -398,7 +447,6 @@ with tab_preorder:
     price_pre = st.text_input("가격 및 할인 조건", placeholder="예: BC카드 구매 시 18,900원", key="pre_pr")
     
     col1, col2 = st.columns(2)
-    # 💡 [사전예약 기간 - 달력 입력 로직]
     pre_dmode = col1.radio("예약기간 입력 방식", ["달력 선택", "직접 입력"], horizontal=True, key="pre_dmode")
     if pre_dmode == "달력 선택":
         pre_dates = col1.date_input("예약 기간 선택", value=[date.today(), date.today()], key="pre_dates")
@@ -407,7 +455,6 @@ with tab_preorder:
         else: period_pre = ""
     else: period_pre = col1.text_input("예약 기간 직접 입력", placeholder="예: 4/24(금) ~ 4/28(화)", key="pre_per")
     
-    # 💡 [수령일자 - 달력 입력 로직]
     pick_dmode = col2.radio("수령일자 입력 방식", ["달력 선택", "직접 입력"], horizontal=True, key="pick_dmode")
     if pick_dmode == "달력 선택":
         p_date = col2.date_input("수령 일자 선택", value=date.today(), key="p_date")
